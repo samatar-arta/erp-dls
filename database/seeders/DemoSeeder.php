@@ -27,7 +27,7 @@ class DemoSeeder extends Seeder
             throw new RuntimeException('DemoSeeder est réservé à l\'environnement local.');
         }
 
-        $this->call([RolesAndPermissionsSeeder::class, OrganisationSeeder::class]);
+        $this->call([RolesAndPermissionsSeeder::class, OrganisationSeeder::class, ModulesRhSeeder::class]);
 
         $structure = [
             'Siège DLS' => ['DLS' => ['Direction Générale', 'Ressources humaines', 'Finance', 'Opérations']],

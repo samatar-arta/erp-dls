@@ -128,4 +128,34 @@ class Employe extends Model
     {
         return $this->hasMany(EmployeFichier::class);
     }
+
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class, 'matricule', 'matricule');
+    }
+
+    public function conges(): HasMany
+    {
+        return $this->hasMany(Conge::class, 'matricule', 'matricule');
+    }
+
+    public function sanctions(): HasMany
+    {
+        return $this->hasMany(Sanction::class, 'matricule', 'matricule');
+    }
+
+    public function evaluations(): HasMany
+    {
+        return $this->hasMany(Evaluation::class, 'matricule', 'matricule');
+    }
+
+    public function promotions(): HasMany
+    {
+        return $this->hasMany(Promotion::class, 'matricule', 'matricule');
+    }
+
+    public function mutations(): HasMany
+    {
+        return $this->hasMany(Mutation::class, 'matricule', 'matricule');
+    }
 }

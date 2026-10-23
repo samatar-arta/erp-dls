@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 1 terminée — en attente de validation avant la Phase 2
+## Phase en cours : Phase 2 terminée — en attente de validation avant la Phase 3
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -16,6 +16,24 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Seeders : rôles/permissions, sociétés, départements DLS, types de contrats ; `DemoSeeder` (local uniquement, mot de passe via `DEMO_PASSWORD`).
 - Filament : Sociétés, Sites, Départements, Site-départements, Types de contrats, Grades, Utilisateurs (rôles et périmètre via le service).
 - Tests : 47 verts (périmètre, équivalence ADMIN/RH_MANAGER, auto-modification, dernier admin, contraintes SQL, téléchargement privé, commande, interface Filament).
+
+### Phase 2 — fait
+- 6 familles indépendantes (documents, congés, sanctions, évaluations, promotions, mutations) : tables `types_*`, `model_*` et enregistrements, plus `niveaux_sanctions`. Migrations 11 à 16 générées puis relues.
+- `ModuleRh` (enum) : classes type/modèle/enregistrement, colonnes, alias de morph map, préfixe de référence par défaut.
+- Compatibilité type/modèle : garde-fou serveur dans les enregistrements (`VerifieCompatibiliteModele`) + règle de validation réutilisable `ModeleCompatibleAvecType`. Modèle inactif refusé.
+- Modèles HTML (`EstUnModele`) : contenu nettoyé à l'enregistrement (`HtmlSanitizer`), un seul modèle par défaut actif par type (contrainte SQL + bascule automatique), version incrémentée si un modèle déjà utilisé est modifié.
+- `reference` unique et nullable ; `reference`, `contenu_genere`, `version_modele`, `fichier_path`, `statut_generation` non assignables en masse (réservés aux services).
+- Seeders : 5 types de documents (1 modèle chacun), 6 types de congés, 3 types de sanctions + 3 niveaux, 4 types d'évaluations (critères pondérés), 4 de promotions, 5 de mutations.
+- Tests : 150 verts au total (103 pour les modules).
+
+### Hypothèses Phase 2
+- Promotions : `ancien_grade_id` / `nouveau_grade_id` (clés vers `grades`) à la place de `ancien_grade` / `nouveau_grade`.
+- Mutations : les champs `nouveau_*` sont nullables (null = inchangé) ; les `ancien_*` sont capturés à la création.
+- Congés : `user_id` = utilisateur ayant saisi la demande ; types de congés (jours/an, mode de calcul, justificatif) fixés à titre indicatif : annuel 30 j calendaires ; maladie, maternité, paternité avec justificatif ; exceptionnel en jours ouvrés.
+- Colonne `statut_generation` (en_attente / genere / echec) ajoutée à chaque table métier pour la Phase 5.
+- La liste blanche de variables du `TemplateRendererService` (Phase 5) devra inclure `<module>.reference` pour chaque module : les gabarits seedés utilisent `{{ conge.reference }}`, `{{ sanction.reference }}`, etc.
+- `jours_feries` et `soldes_conges` seront créés en Phase 6.
+- Pas encore de Policy ni de ressource Filament pour ces modules (Phase 4).
 
 ### Reste hors Phase 1
 - Test 29.1 « RH_SENIOR valide / ADMIN approuve / ADMIN n'approuve pas son propre dossier » : dépend du workflow (Phase 3).
