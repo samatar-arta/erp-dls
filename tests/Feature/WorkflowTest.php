@@ -36,6 +36,8 @@ class WorkflowTest extends TestCase
 
     private User $senior;
 
+    private User $seniorAuteur;
+
     private User $admin;
 
     private User $manager;
@@ -49,6 +51,7 @@ class WorkflowTest extends TestCase
         $this->employe = $this->employeDans($this->sdA1);
         $this->officer = $this->utilisateur(RoleName::RhOfficer, [$this->sdA1]);
         $this->senior = $this->utilisateur(RoleName::RhSenior, [$this->sdA1]);
+        $this->seniorAuteur = $this->utilisateur(RoleName::RhSenior, [$this->sdA1]);
         $this->admin = $this->utilisateur(RoleName::Admin);
         $this->manager = $this->utilisateur(RoleName::RhManager);
     }
@@ -59,9 +62,17 @@ class WorkflowTest extends TestCase
         parent::tearDown();
     }
 
+    /** Les sanctions sont à accès renforcé : leur auteur est un RH_SENIOR (différent du valideur). */
+    private function auteurPour(ModuleRh|Model $module): User
+    {
+        $module = $module instanceof Model ? ModuleRh::pourEnregistrement($module) : $module;
+
+        return $module === ModuleRh::Sanction ? $this->seniorAuteur : $this->officer;
+    }
+
     private function brouillon(ModuleRh $module, ?User $auteur = null): Model
     {
-        $this->actingAs($auteur ?? $this->officer);
+        $this->actingAs($auteur ?? $this->auteurPour($module));
         [$type, $modele] = $this->deuxTypes($module);
 
         return $this->creerEnregistrement($module, $this->employe, $type, $modele);
@@ -69,7 +80,7 @@ class WorkflowTest extends TestCase
 
     private function jusquAApprobation(Model $objet, ?User $validateur = null): void
     {
-        $this->service->soumettre($objet, $this->officer);
+        $this->service->soumettre($objet, $this->auteurPour($objet));
         $this->service->prendreEnCharge($objet, $validateur ?? $this->senior);
         $this->service->valider($objet, $validateur ?? $this->senior);
         $this->service->transmettre($objet, $validateur ?? $this->senior);
@@ -93,7 +104,7 @@ class WorkflowTest extends TestCase
         $workflow = Workflow::query()->where('workflowable_type', $module->alias())->where('workflowable_id', $objet->id)->first();
         $this->assertNotNull($workflow);
         $this->assertSame(WorkflowStatut::Brouillon, $workflow->statut);
-        $this->assertSame($this->officer->id, $workflow->cree_par_id);
+        $this->assertSame($this->auteurPour($module)->id, $workflow->cree_par_id);
         $this->assertNull($objet->fresh()->reference);
         $this->assertTrue($objet->workflow->is($workflow));
     }
@@ -112,7 +123,7 @@ class WorkflowTest extends TestCase
     {
         $objet = $this->brouillon($module);
 
-        $this->service->soumettre($objet, $this->officer);
+        $this->service->soumettre($objet, $this->auteurPour($module));
         $this->assertNull($objet->reference);
         $this->service->prendreEnCharge($objet, $this->senior);
         $this->service->valider($objet, $this->senior);
@@ -167,7 +178,7 @@ class WorkflowTest extends TestCase
     public function test_rejet_n_attribue_pas_de_reference_et_ne_consomme_aucun_numero(): void
     {
         $rejete = $this->brouillon(ModuleRh::Sanction);
-        $this->service->soumettre($rejete, $this->officer);
+        $this->service->soumettre($rejete, $this->auteurPour(ModuleRh::Sanction));
         $this->service->rejeter($rejete, $this->senior, 'Dossier incomplet.');
         $this->assertNull($rejete->fresh()->reference);
 

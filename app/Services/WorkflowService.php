@@ -16,6 +16,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Seul point d'entrée des changements de statut. Chaque transition :
@@ -200,6 +201,11 @@ class WorkflowService
         $employe = $objet->getRelationValue('employe') ?? $objet->employe()->first();
         if (! $employe instanceof Employe || ! $this->perimetre->peutAccederEmploye($acteur, $employe)) {
             throw new AuthorizationException('Cet agent est hors de votre périmètre.');
+        }
+
+        // Droit de lecture propre au module (ex. sanctions à accès renforcé).
+        if (! Gate::forUser($acteur)->allows('view', $objet)) {
+            throw new AuthorizationException('Vous n\'avez pas accès à cet enregistrement.');
         }
 
         // Séparation des responsabilités : valable pour tous les rôles, ADMIN et RH_MANAGER compris.

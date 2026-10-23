@@ -14,8 +14,10 @@ use App\Models\Societe;
 use App\Models\TypeContrat;
 use App\Models\User;
 use App\Policies\EmployePolicy;
+use App\Policies\EnregistrementRhPolicy;
 use App\Policies\OrganisationPolicy;
 use App\Policies\ReferentielPolicy;
+use App\Policies\SanctionPolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
@@ -33,6 +35,10 @@ class AppServiceProvider extends ServiceProvider
         // Alias stables (document, conge, ...) pour le workflow polymorphe. Mapping non « enforced » :
         // User reste enregistré par son nom de classe (Spatie Permission), pour ne pas altérer les rôles existants.
         Relation::morphMap(ModuleRh::morphMap());
+
+        foreach (ModuleRh::cases() as $module) {
+            Gate::policy($module->enregistrementClass(), $module === ModuleRh::Sanction ? SanctionPolicy::class : EnregistrementRhPolicy::class);
+        }
 
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Employe::class, EmployePolicy::class);

@@ -77,6 +77,18 @@ enum ModuleRh: string
         };
     }
 
+    public function libelleSingulier(): string
+    {
+        return match ($this) {
+            self::Document => 'Document',
+            self::Conge => 'Congé',
+            self::Sanction => 'Sanction',
+            self::Evaluation => 'Évaluation',
+            self::Promotion => 'Promotion',
+            self::Mutation => 'Mutation',
+        };
+    }
+
     /** Préfixe de référence par défaut (modifiable ensuite par ADMIN/RH_MANAGER). */
     public function prefixeParDefaut(): string
     {

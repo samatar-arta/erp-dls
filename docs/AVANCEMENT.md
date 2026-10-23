@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 3 terminée — en attente de validation avant la Phase 4
+## Phase en cours : Phase 4 terminée — en attente de validation avant la Phase 5
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -53,6 +53,24 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Incident corrigé : première version (INSERT IGNORE puis SELECT FOR UPDATE) provoquait des interblocages MariaDB (1213) sous concurrence, détectés par le test multi-processus.
 - Les enregistrements sans utilisateur connecté à la création (seeders, console) ont `cree_par_id` nul.
 - Le test de concurrence purge la séquence EVALUATION par un processus dédié (les enfants valident hors de la transaction du test).
+
+### Phase 4 — fait (interfaces Filament métier)
+- Six ressources (Documents, Congés, Sanctions, Évaluations, Promotions, Mutations) sur un socle commun `ModuleRhResource` : formulaire dynamique (le type filtre les modèles actifs et présélectionne le modèle par défaut, règle `ModeleCompatibleAvecType` en contrôle serveur), tableau filtrable (statut, type), fiche avec statut, échéance et frise de l'historique du workflow. Pages communes dans `ModulesRh/Pages`, pages concrètes générées (convention de nommage).
+- Boutons du workflow sur la fiche (un par transition, visibles via `WorkflowService::peutExecuter`, motif obligatoire pour le rejet). Le contrôle réel est refait par le service à l'exécution.
+- Ressource Agents : liste/fiche/création/édition, limitées au périmètre ; création via `EmployeService::creer` (couple société/site/département) ; l'édition ne touche jamais l'affectation ; relation managers « Historique des affectations » (lecture seule) et « Dossier numérique » (disque privé, téléchargement par la route autorisée).
+- `EnregistrementRhService` : création/modification des brouillons (droits, périmètre, situation actuelle lue sur l'agent, salaires ignorés sans permission, agent sorti refusé sauf pour les documents, mutation sans changement refusée, nouvelle affectation contrôlée contre le périmètre).
+- Policies : `EnregistrementRhPolicy` (périmètre de l'agent, modification limitée aux brouillons) et `SanctionPolicy` (accès renforcé). `WorkflowService` exige maintenant aussi la policy `view` du module.
+- Nouvelles permissions : `rh.view|create|update`, `sanctions.view|manage` (ADMIN, RH_MANAGER, RH_SENIOR), `salaires.view` (ADMIN, RH_MANAGER).
+- Tests : 36 nouveaux (InterfaceModulesRhTest, EnregistrementRhServiceTest).
+
+### Hypothèses Phase 4
+- Hors périmètre : l'administration des types et des modèles HTML (12 écrans) est reportée à la Phase 5, avec l'éditeur de modèles et l'aperçu qui dépendent du moteur de rendu.
+- Congés : le nombre de jours est calculé provisoirement en jours calendaires dans le formulaire ; calcul définitif (ouvrés, fériés, solde, chevauchement) en Phase 6.
+- Évaluations : la saisie des notes par critère et le score pondéré arrivent en Phase 7.
+- Promotions : le grade actuel n'existe pas sur l'agent (référentiel vide) ; seule la fonction actuelle est capturée.
+- Les promotions et mutations approuvées ne modifient pas encore l'affectation de l'agent (Phase 7).
+- Les salaires de promotion ne sont visibles/saisissables qu'avec `salaires.view`.
+- Les relations « onglets par module » sur la fiche agent ne sont pas des relation managers : on retrouve les enregistrements d'un agent par la recherche (matricule) de chaque module.
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).

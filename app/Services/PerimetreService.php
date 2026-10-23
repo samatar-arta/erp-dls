@@ -49,6 +49,19 @@ class PerimetreService
         });
     }
 
+    /**
+     * Restreint une requête sur un enregistrement métier (document, congé...) au périmètre de
+     * l'employé concerné (relation « employe »).
+     */
+    public function appliquerViaEmploye(Builder $query, User $user): Builder
+    {
+        if ($this->aAccesGlobal($user)) {
+            return $query;
+        }
+
+        return $query->whereHas('employe', fn (Builder $employes): Builder => $this->appliquer($employes, $user));
+    }
+
     public function peutAffecter(User $user, int $siteId, int $departementId): bool
     {
         if ($this->aAccesGlobal($user)) {

@@ -26,6 +26,12 @@ final class Permissions
     public const FICHIERS_MANAGE = 'employes.fichiers.manage';
     public const AUDIT_VIEW = 'audit.view';
     public const PARAMETRES_MANAGE = 'parametres.manage';
+    public const RH_VIEW = 'rh.view';
+    public const RH_CREATE = 'rh.create';
+    public const RH_UPDATE = 'rh.update';
+    public const SANCTIONS_VIEW = 'sanctions.view';
+    public const SANCTIONS_MANAGE = 'sanctions.manage';
+    public const SALAIRES_VIEW = 'salaires.view';
     public const WORKFLOW_SOUMETTRE = 'workflow.soumettre';
     public const WORKFLOW_VALIDER = 'workflow.valider';
     public const WORKFLOW_APPROUVER = 'workflow.approuver';
@@ -49,6 +55,12 @@ final class Permissions
             self::FICHIERS_MANAGE,
             self::AUDIT_VIEW,
             self::PARAMETRES_MANAGE,
+            self::RH_VIEW,
+            self::RH_CREATE,
+            self::RH_UPDATE,
+            self::SANCTIONS_VIEW,
+            self::SANCTIONS_MANAGE,
+            self::SALAIRES_VIEW,
             self::WORKFLOW_SOUMETTRE,
             self::WORKFLOW_VALIDER,
             self::WORKFLOW_APPROUVER,
@@ -72,6 +84,11 @@ final class Permissions
                 self::EMPLOYES_CREATE,
                 self::EMPLOYES_UPDATE,
                 self::FICHIERS_MANAGE,
+                self::RH_VIEW,
+                self::RH_CREATE,
+                self::RH_UPDATE,
+                self::SANCTIONS_VIEW,
+                self::SANCTIONS_MANAGE,
                 self::WORKFLOW_SOUMETTRE,
                 self::WORKFLOW_VALIDER,
             ],
@@ -80,12 +97,18 @@ final class Permissions
                 self::EMPLOYES_CREATE,
                 self::EMPLOYES_UPDATE,
                 self::FICHIERS_MANAGE,
+                self::RH_VIEW,
+                self::RH_CREATE,
+                self::RH_UPDATE,
                 self::WORKFLOW_SOUMETTRE,
             ],
             RoleName::RhJunior => [
                 ...$lecture,
                 self::EMPLOYES_CREATE,
                 self::EMPLOYES_UPDATE,
+                self::RH_VIEW,
+                self::RH_CREATE,
+                self::RH_UPDATE,
                 self::WORKFLOW_SOUMETTRE,
             ],
             default => [],
