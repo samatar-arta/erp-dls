@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Enums\ModuleRh;
 use App\Models\Departement;
 use App\Models\Employe;
 use App\Models\Grade;
@@ -16,6 +17,7 @@ use App\Policies\EmployePolicy;
 use App\Policies\OrganisationPolicy;
 use App\Policies\ReferentielPolicy;
 use App\Policies\UserPolicy;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -28,6 +30,10 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Alias stables (document, conge, ...) pour le workflow polymorphe. Mapping non « enforced » :
+        // User reste enregistré par son nom de classe (Spatie Permission), pour ne pas altérer les rôles existants.
+        Relation::morphMap(ModuleRh::morphMap());
+
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Employe::class, EmployePolicy::class);
 

@@ -26,6 +26,9 @@ final class Permissions
     public const FICHIERS_MANAGE = 'employes.fichiers.manage';
     public const AUDIT_VIEW = 'audit.view';
     public const PARAMETRES_MANAGE = 'parametres.manage';
+    public const WORKFLOW_SOUMETTRE = 'workflow.soumettre';
+    public const WORKFLOW_VALIDER = 'workflow.valider';
+    public const WORKFLOW_APPROUVER = 'workflow.approuver';
 
     /**
      * @return list<string>
@@ -46,6 +49,9 @@ final class Permissions
             self::FICHIERS_MANAGE,
             self::AUDIT_VIEW,
             self::PARAMETRES_MANAGE,
+            self::WORKFLOW_SOUMETTRE,
+            self::WORKFLOW_VALIDER,
+            self::WORKFLOW_APPROUVER,
         ];
     }
 
@@ -61,16 +67,26 @@ final class Permissions
         $lecture = [self::ORGANISATION_VIEW, self::REFERENTIELS_VIEW, self::EMPLOYES_VIEW, self::FICHIERS_VIEW];
 
         return match ($role) {
-            RoleName::RhSenior, RoleName::RhOfficer => [
+            RoleName::RhSenior => [
                 ...$lecture,
                 self::EMPLOYES_CREATE,
                 self::EMPLOYES_UPDATE,
                 self::FICHIERS_MANAGE,
+                self::WORKFLOW_SOUMETTRE,
+                self::WORKFLOW_VALIDER,
+            ],
+            RoleName::RhOfficer => [
+                ...$lecture,
+                self::EMPLOYES_CREATE,
+                self::EMPLOYES_UPDATE,
+                self::FICHIERS_MANAGE,
+                self::WORKFLOW_SOUMETTRE,
             ],
             RoleName::RhJunior => [
                 ...$lecture,
                 self::EMPLOYES_CREATE,
                 self::EMPLOYES_UPDATE,
+                self::WORKFLOW_SOUMETTRE,
             ],
             default => [],
         };

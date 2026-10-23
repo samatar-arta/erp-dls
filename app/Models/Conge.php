@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\HasWorkflow;
 use App\Models\Concerns\VerifieCompatibiliteModele;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Conge extends Model
 {
-    use VerifieCompatibiliteModele;
+    use HasWorkflow, VerifieCompatibiliteModele;
 
     public const TYPE_FK = 'type_conge_id';
 

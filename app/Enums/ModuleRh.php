@@ -36,7 +36,30 @@ enum ModuleRh: string
     case Promotion = 'PROMOTION';
     case Mutation = 'MUTATION';
 
-    /** Alias du morph map (workflows polymorphes, Phase 3). */
+    /** Module auquel appartient un enregistrement métier. */
+    public static function pourEnregistrement(\Illuminate\Database\Eloquent\Model $objet): self
+    {
+        foreach (self::cases() as $module) {
+            if ($objet instanceof ($module->enregistrementClass())) {
+                return $module;
+            }
+        }
+
+        throw new \InvalidArgumentException('Enregistrement hors des six modules RH : '.$objet::class);
+    }
+
+    /** @return array<string, class-string<\Illuminate\Database\Eloquent\Model>> alias => classe */
+    public static function morphMap(): array
+    {
+        $map = [];
+        foreach (self::cases() as $module) {
+            $map[$module->alias()] = $module->enregistrementClass();
+        }
+
+        return $map;
+    }
+
+    /** Alias du morph map (workflows polymorphes). */
     public function alias(): string
     {
         return strtolower($this->value);

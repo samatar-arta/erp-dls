@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 2 terminée — en attente de validation avant la Phase 3
+## Phase en cours : Phase 3 terminée — en attente de validation avant la Phase 4
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -35,8 +35,27 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - `jours_feries` et `soldes_conges` seront créés en Phase 6.
 - Pas encore de Policy ni de ressource Filament pour ces modules (Phase 4).
 
+### Phase 3 — fait (références et workflow)
+- `ReferenceService` : une seule instruction atomique `INSERT ... ON DUPLICATE KEY UPDATE` crée/incrémente la séquence (module, année), puis lecture verrouillante. Numéro rendu si la transaction est annulée (pas de trou). Format `{numero:N}/{prefixe}/{annee}`, préfixe et format configurables (`reference_modules`, `ReferencesSeeder`), horloge injectable (`$date` ou `Carbon::setTestNow`).
+- Workflow centralisé : tables `workflows` (une ligne par enregistrement, unique type+id) et `workflow_histories` (ajout seul). Enums `WorkflowStatut` et `WorkflowAction` (matrice des transitions). Trait `HasWorkflow` sur les six modèles (workflow BROUILLON créé avec l'enregistrement, référence immuable, suppression limitée aux brouillons sans référence).
+- Circuit : BROUILLON → DOCUMENT_SOUMIS (soumettre) → EN_ATTENTE_VALIDATION (prendre en charge) → VALIDE (valider) → EN_ATTENTE_APPROBATION (transmettre) → APPROUVE (approuver, c'est là que la référence est attribuée). Rejet (commentaire obligatoire) depuis toute étape en cours ; REJETE/EXPIRE → BROUILLON (rouvrir) ; EXPIRE par le système.
+- `WorkflowService` : verrou sur la ligne workflow puis revérification du statut, contrôle de l'acteur (actif, permission, périmètre, séparation), historique dans la même transaction, `expirerEchus()` prêt pour le planificateur (Phase 8), `peutExecuter()` pour l'interface (Phase 4).
+- Permissions `workflow.soumettre|valider|approuver` : ADMIN/RH_MANAGER = les trois ; RH_SENIOR = soumettre + valider ; RH_OFFICER et RH_JUNIOR = soumettre.
+- Morph map `document|conge|sanction|evaluation|promotion|mutation`.
+- Tests : 76 nouveaux (ReferencesTest, WorkflowTest), dont concurrence réelle (6 processus PHP) et les cas 29.1 reportés (SENIOR valide, ADMIN approuve, ADMIN/RH_MANAGER ne traitent pas leur propre dossier).
+
+### Hypothèses Phase 3
+- Morph map non « enforced » (`Relation::morphMap`) : User reste enregistré par son nom de classe pour ne pas casser les rôles Spatie déjà présents. Écart assumé par rapport à `enforceMorphMap`.
+- Séparation des responsabilités : l'auteur (`cree_par_id`, utilisateur connecté à la création) et le soumetteur ne peuvent ni prendre en charge, ni valider, ni transmettre, ni approuver, ni rejeter, tous rôles confondus. Option `workflow.approbateur_different_validateur` (défaut : désactivée) pour exiger en plus un approbateur différent du validateur.
+- Délai de traitement : 48 h par étape (`config/workflow.php`, `WORKFLOW_DELAI_HEURES`), renouvelé à chaque étape ; l'expiration effective est planifiée en Phase 8.
+- Rejeter une approbation exige `workflow.approuver` ; rejeter les étapes précédentes exige `workflow.valider`.
+- Rouvrir (REJETE/EXPIRE → BROUILLON) exige `workflow.soumettre` ; l'auteur d'origine reste exclu de la validation/approbation du nouveau cycle.
+- Incident corrigé : première version (INSERT IGNORE puis SELECT FOR UPDATE) provoquait des interblocages MariaDB (1213) sous concurrence, détectés par le test multi-processus.
+- Les enregistrements sans utilisateur connecté à la création (seeders, console) ont `cree_par_id` nul.
+- Le test de concurrence purge la séquence EVALUATION par un processus dédié (les enfants valident hors de la transaction du test).
+
 ### Reste hors Phase 1
-- Test 29.1 « RH_SENIOR valide / ADMIN approuve / ADMIN n'approuve pas son propre dossier » : dépend du workflow (Phase 3).
+- Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
 - Ressource Filament Employés complète (onglets, dossier numérique) : Phase 4.
 - Journalisation d'audit des changements de rôles : Phase 9 (AuditService).
 
