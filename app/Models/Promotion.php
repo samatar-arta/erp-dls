@@ -37,6 +37,7 @@ class Promotion extends Model
     {
         return [
             'date_effet' => 'date',
+            'appliquee_le' => 'datetime',
             'ancien_salaire' => 'decimal:2',
             'nouveau_salaire' => 'decimal:2',
         ];

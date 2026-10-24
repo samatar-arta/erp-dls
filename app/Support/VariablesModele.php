@@ -40,7 +40,7 @@ final class VariablesModele
             ModuleRh::Document => ['date_production' => 'date_production', 'commentaire' => 'commentaire'],
             ModuleRh::Conge => ['date_debut' => 'date_debut', 'date_fin' => 'date_fin', 'nbre_jours' => 'nbre_jours', 'motif' => 'motif'],
             ModuleRh::Sanction => ['date_sanction' => 'date_sanction', 'description' => 'description', 'motif' => 'motif', 'niveau' => 'niveau.name'],
-            ModuleRh::Evaluation => ['date_evaluation' => 'date_evaluation', 'note' => 'note', 'appreciation' => 'appreciation', 'objectifs' => 'objectifs'],
+            ModuleRh::Evaluation => ['date_evaluation' => 'date_evaluation', 'note' => 'note', 'criteres' => 'criteres_resume', 'appreciation' => 'appreciation', 'objectifs' => 'objectifs'],
             ModuleRh::Promotion => ['ancienne_fonction' => 'ancienne_fonction', 'nouvelle_fonction' => 'nouvelle_fonction', 'nouveau_grade' => 'nouveauGrade.name', 'date_effet' => 'date_effet', 'motif' => 'motif'],
             ModuleRh::Mutation => [
                 'ancienne_fonction' => 'ancienne_fonction', 'nouvelle_fonction' => 'nouvelle_fonction',

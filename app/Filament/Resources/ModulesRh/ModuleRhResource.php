@@ -39,6 +39,21 @@ abstract class ModuleRhResource extends Resource
 
     abstract public static function module(): ModuleRh;
 
+    /** Point d'extension : réagit au choix (ou au changement automatique) du modèle dans le formulaire. */
+    protected static function apresChoixModele(Set $set, mixed $modeleId): void
+    {
+    }
+
+    /**
+     * Entrées supplémentaires de la fiche (après les champs de affichage()).
+     *
+     * @return list<\Filament\Schemas\Components\Component>
+     */
+    protected static function entreesSupplementaires(): array
+    {
+        return [];
+    }
+
     /**
      * Champs propres au module (après agent / type / modèle).
      *
@@ -106,11 +121,15 @@ abstract class ModuleRhResource extends Resource
                     ->live()
                     ->afterStateUpdated(function (Set $set, mixed $state) use ($module, $cleModele, $cleType): void {
                         // Le modèle par défaut du type est présélectionné ; jamais un modèle d'un autre type.
-                        $set($cleModele, $state === null ? null : $module->modeleClass()::query()
-                            ->where($cleType, $state)->where('is_active', true)->orderByDesc('is_default')->value('id'));
+                        $modeleId = $state === null ? null : $module->modeleClass()::query()
+                            ->where($cleType, $state)->where('is_active', true)->orderByDesc('is_default')->value('id');
+                        $set($cleModele, $modeleId);
+                        static::apresChoixModele($set, $modeleId);
                     }),
                 Select::make($cleModele)
                     ->label('Modèle')
+                    ->live()
+                    ->afterStateUpdated(fn (Set $set, mixed $state) => static::apresChoixModele($set, $state))
                     ->options(fn (Get $get): array => $get($cleType) === null ? [] : $module->modeleClass()::query()
                         ->where($cleType, $get($cleType))->where('is_active', true)->orderByDesc('is_default')->pluck('titre', 'id')->all())
                     ->required(fn (Get $get): bool => static::modeleRequis($module, $get($cleType)))
@@ -149,7 +168,7 @@ abstract class ModuleRhResource extends Resource
                 TextEntry::make('employe.matricule')->label('Matricule'),
                 TextEntry::make('type.name')->label('Type'),
             ]),
-            Section::make('Détails')->columns(2)->schema($entrees),
+            Section::make('Détails')->columns(2)->schema([...$entrees, ...static::entreesSupplementaires()]),
             Section::make('Historique du workflow')->schema([
                 RepeatableEntry::make('workflow.historiques')->label('')->columns(5)->schema([
                     TextEntry::make('created_at')->label('Date')->dateTime('d/m/Y H:i'),

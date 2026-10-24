@@ -60,6 +60,7 @@ class MutationResource extends ModuleRhResource
             'nouvelle_fonction' => 'Nouvelle fonction',
             'date_effet' => 'Date d\'effet',
             'motif' => 'Motif',
+            'appliquee_le' => 'Effet appliqué le',
         ];
     }
 }

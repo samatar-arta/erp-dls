@@ -10,6 +10,10 @@ use App\Exceptions\RegleMetierException;
 use App\Models\Conge;
 use App\Models\Document;
 use App\Models\Employe;
+use App\Models\Evaluation;
+use App\Models\ModelEvaluation;
+use App\Models\Mutation;
+use App\Models\Promotion;
 use App\Models\TypeConge;
 use App\Models\TypeDocument;
 use App\Models\User;
@@ -28,6 +32,7 @@ class EnregistrementRhService
     public function __construct(
         private readonly PerimetreService $perimetre,
         private readonly CongeService $conges,
+        private readonly EvaluationService $evaluations,
     ) {
     }
 
@@ -56,8 +61,7 @@ class EnregistrementRhService
 
         return DB::transaction(function () use ($classe, $donnees): Model {
             $enregistrement = new $classe;
-            $enregistrement->fill($donnees);
-            $enregistrement->save();
+            $this->remplir($enregistrement, $donnees)->save();
 
             return $enregistrement;
         });
@@ -91,7 +95,16 @@ class EnregistrementRhService
                 );
             }
 
-            $enregistrement->fill($donnees)->save();
+            if ($enregistrement instanceof Evaluation) {
+                // Notes et note finale : recalculées sur le modèle retenu ; les notes déjà saisies servent de base.
+                $donnees = $this->noterEvaluation($donnees + $enregistrement->only(['model_evaluation_id', 'notes_criteres']));
+            }
+
+            if ($enregistrement instanceof Promotion || $enregistrement instanceof Mutation) {
+                $this->verifierDateEffet($enregistrement->employe, $donnees['date_effet'] ?? $enregistrement->date_effet);
+            }
+
+            $this->remplir($enregistrement, $donnees)->save();
 
             return $enregistrement;
         });
@@ -128,6 +141,44 @@ class EnregistrementRhService
                 $type->name,
                 $existant->date_production->format('d/m/Y'),
                 $delai,
+            ));
+        }
+    }
+
+    /**
+     * Champs calculés par le serveur (jamais assignables en masse) : posés ici explicitement.
+     *
+     * @param  array<string, mixed>  $donnees
+     */
+    private function remplir(Model $enregistrement, array $donnees): Model
+    {
+        $calcules = array_intersect_key($donnees, ['note' => true]);
+
+        return $enregistrement->fill(array_diff_key($donnees, $calcules))->forceFill($calcules);
+    }
+
+    /**
+     * @param  array<string, mixed>  $donnees
+     * @return array<string, mixed>
+     */
+    private function noterEvaluation(array $donnees): array
+    {
+        $modele = ModelEvaluation::query()->find($donnees['model_evaluation_id'] ?? null);
+        $resultat = $this->evaluations->noter($modele, $donnees['notes_criteres'] ?? null);
+
+        // La note finale saisie est toujours écartée au profit du calcul.
+        return ['notes_criteres' => $resultat['notes_criteres'], 'note' => $resultat['note']] + $donnees;
+    }
+
+    /** Une promotion ou mutation ne peut prendre effet avant le début de l'affectation courante de l'agent. */
+    private function verifierDateEffet(Employe $employe, mixed $dateEffet): void
+    {
+        $debut = $employe->affectationCourante()->first()?->date_debut;
+
+        if ($debut !== null && $dateEffet !== null && Carbon::parse($dateEffet)->lt($debut)) {
+            throw new RegleMetierException(sprintf(
+                'La date d\'effet ne peut pas précéder le début de l\'affectation actuelle de l\'agent (%s).',
+                $debut->format('d/m/Y'),
             ));
         }
     }
@@ -177,8 +228,10 @@ class EnregistrementRhService
                 break;
             case ModuleRh::Evaluation:
                 $donnees['evaluateur_id'] ??= $acteur->getKey();
+                $donnees = $this->noterEvaluation($donnees);
                 break;
             case ModuleRh::Promotion:
+                $this->verifierDateEffet($employe, $donnees['date_effet'] ?? null);
                 $donnees['cree_par'] = $acteur->getKey();
                 $donnees['ancienne_fonction'] = $employe->fonction;
                 if (! $acteur->can(\App\Support\Permissions::SALAIRES_VIEW)) {
@@ -199,6 +252,7 @@ class EnregistrementRhService
      */
     private function completerMutation(array $donnees, Employe $employe, User $acteur): array
     {
+        $this->verifierDateEffet($employe, $donnees['date_effet'] ?? null);
         $donnees['cree_par'] = $acteur->getKey();
         $donnees['ancien_site_id'] = $employe->site_id;
         $donnees['ancien_departement_id'] = $employe->departement_id;

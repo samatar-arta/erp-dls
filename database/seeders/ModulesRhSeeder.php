@@ -125,7 +125,7 @@ class ModulesRhSeeder extends Seeder
 
         foreach ($types as [$code, $nom]) {
             $type = TypeEvaluation::query()->firstOrCreate(['code' => $code], ['name' => $nom]);
-            $corps = "Évaluation de {{ employe.name }}, matricule {{ employe.matricule }}, {{ employe.fonction }} ({{ employe.departement.name }}), réalisée le {{ evaluation.date_evaluation }}.<br>Note finale pondérée : {{ evaluation.note }}.";
+            $corps = "Évaluation de {{ employe.name }}, matricule {{ employe.matricule }}, {{ employe.fonction }} ({{ employe.departement.name }}), réalisée le {{ evaluation.date_evaluation }}.<br>Note finale pondérée : {{ evaluation.note }} / 20.<br>Détail : {{ evaluation.criteres }}";
             $this->modele(ModelEvaluation::class, 'type_evaluation_id', $type->id, $nom, $this->gabarit($nom, '{{ evaluation.reference }}', '{{ date_du_jour }}', $corps), ['criteres' => $criteres]);
         }
     }

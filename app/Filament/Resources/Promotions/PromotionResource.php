@@ -53,6 +53,7 @@ class PromotionResource extends ModuleRhResource
             'nouveauGrade.name' => 'Nouveau grade',
             'date_effet' => 'Date d\'effet',
             'motif' => 'Motif',
+            'appliquee_le' => 'Effet appliqué le',
         ];
     }
 }

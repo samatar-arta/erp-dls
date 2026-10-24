@@ -34,6 +34,7 @@ class WorkflowService
         private readonly PerimetreService $perimetre,
         private readonly GenerationPdfService $pdf,
         private readonly CongeService $conges,
+        private readonly EffetsRhService $effets,
     ) {}
 
     public function executer(WorkflowAction $action, Model $objet, ?User $acteur, ?string $commentaire = null): Workflow
@@ -255,6 +256,7 @@ class WorkflowService
                 if ($objet instanceof Conge) {
                     $this->conges->debiterALApprobation($objet);
                 }
+                $this->effets->appliquerALApprobation($objet, $acteur);
                 $this->attribuerReference($objet);
                 $this->pdf->planifier($objet);
                 break;

@@ -34,6 +34,7 @@ class Mutation extends Model
     {
         return [
             'date_effet' => 'date',
+            'appliquee_le' => 'datetime',
         ];
     }
 

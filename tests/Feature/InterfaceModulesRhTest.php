@@ -18,6 +18,7 @@ use App\Filament\Resources\Mutations\MutationResource;
 use App\Filament\Resources\Promotions\PromotionResource;
 use App\Filament\Resources\Sanctions\SanctionResource;
 use App\Models\Employe;
+use App\Models\ModelEvaluation;
 use App\Models\NiveauSanction;
 use App\Models\User;
 use App\Services\WorkflowService;
@@ -149,11 +150,21 @@ class InterfaceModulesRhTest extends TestCase
             // Changer la société réinitialise le département (comportement voulu) : on le resaisit.
             $test->fillForm(['nouveau_departement_id' => $champs['nouveau_departement_id']]);
         }
+        if ($module === ModuleRh::Evaluation) {
+            // Le choix du modèle affiche ses critères : chaque note est obligatoire (Phase 7).
+            $test->fillForm(['notes_criteres' => array_map(
+                static fn (array $c): array => ['libelle' => $c['libelle'], 'note' => 12],
+                ModelEvaluation::query()->findOrFail($champs['model_evaluation_id'])->criteres,
+            )]);
+        }
         $test
             ->call('create')
             ->assertHasNoFormErrors();
 
         $enregistrement = $module->enregistrementClass()::query()->firstOrFail();
+        if ($module === ModuleRh::Evaluation) {
+            $this->assertEquals(12.0, $enregistrement->note);
+        }
         $this->assertSame($this->employe->matricule, $enregistrement->matricule);
         $this->assertNull($enregistrement->reference);
         $this->assertSame(WorkflowStatut::Brouillon, $enregistrement->workflow->statut);

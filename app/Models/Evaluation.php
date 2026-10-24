@@ -41,6 +41,25 @@ class Evaluation extends Model
         ];
     }
 
+    /** Détail des notes par critère en une ligne de texte (variable de modèle « evaluation.criteres »). */
+    public function getCriteresResumeAttribute(): string
+    {
+        return collect($this->notes_criteres ?? [])
+            ->map(fn (array $c): string => sprintf(
+                '%s : %s/%s (coef. %s)',
+                $c['libelle'],
+                $this->formaterNombre((float) $c['note']),
+                $this->formaterNombre((float) $c['note_max']),
+                $this->formaterNombre((float) $c['coefficient']),
+            ))
+            ->implode(' ; ');
+    }
+
+    private function formaterNombre(float $valeur): string
+    {
+        return rtrim(rtrim(number_format($valeur, 2, ',', ''), '0'), ',');
+    }
+
     public function employe(): BelongsTo
     {
         return $this->belongsTo(Employe::class, 'matricule', 'matricule');

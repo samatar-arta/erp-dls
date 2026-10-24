@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 6 terminée — en attente de validation avant la Phase 7
+## Phase en cours : Phase 7 terminée — en attente de validation avant la Phase 8
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -111,6 +111,24 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Pas de réintégration du solde après approbation (le circuit n'a pas d'annulation d'un congé approuvé).
 - Pas de test de concurrence multi-processus sur le débit du solde (le verrou suit le schéma validé de `ReferenceService`).
 - Migration `2026_10_28_000019` non encore appliquée sur la base de développement `erp_rh_dls` (tests : base `erp_rh_dls_test`).
+
+### Phase 7 — fait (évaluations notées, effets des promotions et mutations) — en attente de validation
+- `EvaluationService` : notes par critère selon les critères du modèle (libellé, coefficient, note max) ; note finale = moyenne pondérée de chaque critère ramené sur 20, arrondie à 2 décimales. Notes obligatoires et comprises entre 0 et la note max du critère ; critère inconnu refusé. Les critères (avec coefficient et barème) sont figés dans `notes_criteres` avec l'évaluation. `note` est toujours calculée par le serveur, jamais assignable en masse, recalculée à chaque modification d'un brouillon. Modèle sans critères : pas de note chiffrée.
+- Écran : répéteur « Notes par critère » rempli automatiquement au choix du modèle (ou du type), barème affiché ; fiche avec note finale et détail. Variable de modèle `evaluation.criteres` (détail en une ligne) et gabarit seedé enrichi (« Note finale pondérée : X / 20 » + détail).
+- `EffetsRhService` : une mutation approuvée change société / site / département / fonction de l'agent (champ `nouveau_*` vide = inchangé) et une promotion approuvée change sa fonction, toujours via `EmployeService::changerAffectation` (ligne d'historique clôturée puis nouvelle ligne, source `mutation` ou `promotion`).
+- Application à l'approbation, dans la transaction du workflow, si la date d'effet est échue ; sinon différée. Un agent qui n'est plus actif ou une impossibilité (couple société/site/département fermé, date antérieure) annule l'approbation entière (pas de référence, pas de PDF). Colonne `appliquee_le` (migration 20) : un effet n'est jamais appliqué deux fois.
+- Commande `php artisan dls:appliquer-effets` (`appliquerEchus()`, par ordre de date d'effet) pour les effets différés ; à planifier en Phase 8. Un échec d'un effet est journalisé et n'empêche pas les suivants.
+- Contrôle à la création / modification : la date d'effet d'une promotion ou mutation ne peut pas précéder le début de l'affectation actuelle de l'agent.
+- Tests : 18 nouveaux (`EvaluationsEtEffetsTest`).
+
+### Hypothèses Phase 7 (à valider)
+- Note finale sur 20, quel que soit le barème des critères (chaque critère est ramené sur 20 avant pondération).
+- Toutes les notes de critères sont obligatoires dès que le modèle en définit.
+- Une promotion ne modifie que la fonction : le grade et le salaire restent dans le dossier de promotion (l'agent n'a ni grade courant ni salaire). Pas de colonne `grade_id` ajoutée sur l'agent.
+- Une promotion / mutation dont la date d'effet est échue à l'approbation s'applique immédiatement avec la date d'effet saisie (historique daté de cette date, même passée).
+- Le périmètre de l'approbateur n'est pas recontrôlé sur la nouvelle affectation (seuls ADMIN et RH_MANAGER approuvent, accès global) ; le périmètre du créateur est contrôlé à la création.
+- Les effets différés attendent le planificateur (Phase 8) ou un lancement manuel de la commande.
+- Migration `2026_10_29_000020` non encore appliquée sur la base de développement `erp_rh_dls`.
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
