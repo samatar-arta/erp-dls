@@ -7,10 +7,13 @@ namespace App\Services;
 use App\Enums\ModuleRh;
 use App\Enums\WorkflowStatut;
 use App\Exceptions\RegleMetierException;
+use App\Models\Document;
 use App\Models\Employe;
+use App\Models\TypeDocument;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -39,6 +42,10 @@ class EnregistrementRhService
 
         if ($module !== ModuleRh::Document && $employe->statut_employe !== 'actif') {
             throw new RegleMetierException('Cet agent n\'est plus en activité.');
+        }
+
+        if ($module === ModuleRh::Document) {
+            $this->verifierDelaiRenouvellement($donnees, $employe);
         }
 
         $donnees = $this->completer($module, $donnees, $employe, $acteur);
@@ -75,6 +82,41 @@ class EnregistrementRhService
 
             return $enregistrement;
         });
+    }
+
+    /**
+     * Un type de document peut imposer un délai avant d'en produire un nouveau pour le même agent.
+     * Les documents rejetés ou expirés ne comptent pas.
+     *
+     * @param  array<string, mixed>  $donnees
+     */
+    private function verifierDelaiRenouvellement(array $donnees, Employe $employe): void
+    {
+        $type = TypeDocument::query()->find($donnees['type_document_id'] ?? null);
+        $delai = $type?->delai_renouvellement_jours;
+
+        if ($type === null || $delai === null) {
+            return;
+        }
+
+        $date = Carbon::parse($donnees['date_production'] ?? now());
+
+        $existant = Document::query()
+            ->where('matricule', $employe->matricule)
+            ->where('type_document_id', $type->getKey())
+            ->whereBetween('date_production', [$date->copy()->subDays($delai)->toDateString(), $date->copy()->addDays($delai)->toDateString()])
+            ->whereHas('workflow', fn ($q) => $q->whereNotIn('statut', [WorkflowStatut::Rejete->value, WorkflowStatut::Expire->value]))
+            ->orderByDesc('date_production')
+            ->first();
+
+        if ($existant !== null) {
+            throw new RegleMetierException(sprintf(
+                'Un document « %s » a déjà été établi pour cet agent le %s ; le renouvellement est possible après %d jours.',
+                $type->name,
+                $existant->date_production->format('d/m/Y'),
+                $delai,
+            ));
+        }
     }
 
     private function employeAccessible(string $matricule, User $acteur): Employe

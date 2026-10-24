@@ -140,6 +140,10 @@ abstract class ModuleRhResource extends Resource
                 TextEntry::make('workflow.statut')->label('Statut')->badge()
                     ->formatStateUsing(fn (?WorkflowStatut $state): ?string => $state?->label())
                     ->color(fn (?WorkflowStatut $state): string => static::couleurStatut($state)),
+                TextEntry::make('statut_generation')->label('PDF')->placeholder('—')
+                    ->formatStateUsing(fn (?string $state): ?string => match ($state) {
+                        'genere' => 'Généré', 'en_attente' => 'En cours de génération', 'echec' => 'Échec (relancer)', default => $state,
+                    }),
                 TextEntry::make('workflow.echeance_at')->label('Échéance')->dateTime('d/m/Y H:i')->placeholder('—'),
                 TextEntry::make('employe.name')->label('Agent'),
                 TextEntry::make('employe.matricule')->label('Matricule'),

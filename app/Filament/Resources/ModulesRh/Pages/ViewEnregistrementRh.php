@@ -6,7 +6,9 @@ namespace App\Filament\Resources\ModulesRh\Pages;
 
 use App\Enums\WorkflowAction;
 use App\Exceptions\RegleMetierException;
+use App\Jobs\GenererPdfJob;
 use App\Services\WorkflowService;
+use App\Support\Permissions;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Textarea;
@@ -22,7 +24,26 @@ abstract class ViewEnregistrementRh extends ViewRecord
 {
     protected function getHeaderActions(): array
     {
-        $actions = [EditAction::make()];
+        $actions = [
+            EditAction::make(),
+            Action::make('pdf')
+                ->label('Télécharger le PDF')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->visible(fn (): bool => $this->getRecord()->statut_generation === 'genere')
+                ->url(fn (): string => route('enregistrements.pdf', [static::getResource()::module()->value, $this->getRecord()->getKey()])),
+            Action::make('regenerer_pdf')
+                ->label('Relancer la génération du PDF')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->visible(fn (): bool => in_array($this->getRecord()->statut_generation, ['en_attente', 'echec'], true)
+                    && (bool) auth()->user()?->can(Permissions::WORKFLOW_APPROUVER))
+                ->requiresConfirmation()
+                ->action(function (): void {
+                    // Idempotent : la référence et le contenu déjà figé ne changent pas.
+                    GenererPdfJob::dispatch(static::getResource()::module()->value, (int) $this->getRecord()->getKey());
+                    Notification::make()->title('Génération du PDF relancée')->success()->send();
+                }),
+        ];
 
         foreach (WorkflowAction::cases() as $transition) {
             if ($transition->estSysteme()) {

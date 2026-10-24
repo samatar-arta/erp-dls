@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns;
 
+use App\Enums\ModuleRh;
+use App\Exceptions\RegleMetierException;
+use App\Services\TemplateRendererService;
 use App\Support\HtmlSanitizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +26,12 @@ trait EstUnModele
     {
         static::saving(static function (Model $modele): void {
             if ($modele->isDirty('contenu')) {
+                // Seules les variables de la liste blanche du module sont acceptées.
+                $inconnues = app(TemplateRendererService::class)->variablesInconnues(ModuleRh::pourModele($modele), (string) $modele->contenu);
+                if ($inconnues !== []) {
+                    throw new RegleMetierException('Variable(s) non autorisée(s) dans le modèle : '.implode(', ', $inconnues).'.');
+                }
+
                 $modele->contenu = HtmlSanitizer::nettoyer((string) $modele->contenu);
             }
 

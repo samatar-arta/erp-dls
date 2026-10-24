@@ -8,6 +8,7 @@ use App\Enums\ModuleRh;
 use App\Enums\WorkflowAction;
 use App\Enums\WorkflowStatut;
 use App\Exceptions\RegleMetierException;
+use App\Jobs\GenererPdfJob;
 use App\Models\Employe;
 use App\Models\User;
 use App\Models\Workflow;
@@ -30,6 +31,7 @@ class WorkflowService
     public function __construct(
         private readonly ReferenceService $references,
         private readonly PerimetreService $perimetre,
+        private readonly GenerationPdfService $pdf,
     ) {}
 
     public function executer(WorkflowAction $action, Model $objet, ?User $acteur, ?string $commentaire = null): Workflow
@@ -86,6 +88,11 @@ class WorkflowService
 
         $objet->unsetRelation('workflow');
         $objet->refresh();
+
+        // Le PDF est produit en arrière-plan, une fois l'approbation validée en base.
+        if ($action === WorkflowAction::Approuver && $objet->getAttribute('statut_generation') === 'en_attente') {
+            GenererPdfJob::dispatch(ModuleRh::pourEnregistrement($objet)->value, (int) $objet->getKey());
+        }
 
         return $workflow;
     }
@@ -241,6 +248,7 @@ class WorkflowService
             case WorkflowAction::Approuver:
                 $workflow->forceFill(['approuve_par_id' => $acteur?->getKey()]);
                 $this->attribuerReference($objet);
+                $this->pdf->planifier($objet);
                 break;
             default:
                 break;

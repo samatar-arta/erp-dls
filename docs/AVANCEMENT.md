@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 4 terminée — en attente de validation avant la Phase 5
+## Phase en cours : Phase 5 terminée — en attente de validation avant la Phase 6
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -71,6 +71,24 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Les promotions et mutations approuvées ne modifient pas encore l'affectation de l'agent (Phase 7).
 - Les salaires de promotion ne sont visibles/saisissables qu'avec `salaires.view`.
 - Les relations « onglets par module » sur la fiche agent ne sont pas des relation managers : on retrouve les enregistrements d'un agent par la recherche (matricule) de chaque module.
+
+### Phase 5 — fait (documents, PDF, signature)
+- `TemplateRendererService` : remplacement des seules variables de la liste blanche `VariablesModele` (par module, incluant `<module>.reference`, sans aucune donnée sensible : ni salaires, ni CNI/CNSS, ni téléphone/adresse), valeurs échappées, modèle jamais compilé (ni Blade ni PHP), sortie repassée au `HtmlSanitizer`. Aperçu avec noms de variables entre crochets. Variable inconnue = vide au rendu et refus à l'enregistrement du modèle (`EstUnModele`).
+- `GenerationPdfService` + `GenererPdfJob` (en file `database`, unique par enregistrement, 3 essais) : PDF DomPDF sur le disque privé, chemin déterministe, contenu HTML figé à la première génération (`contenu_genere`, `version_modele`), empreinte SHA-256 (`empreinte_pdf`) et date (`genere_le`). Idempotent : un PDF valide n'est jamais régénéré, la référence n'est jamais touchée ; un fichier absent ou altéré est régénéré à l'identique depuis le contenu figé.
+- Déclenchement à l'approbation (`statut_generation = en_attente`, job envoyé après validation de la transaction). Bouton « Relancer la génération » (permission d'approbation) et « Télécharger le PDF » sur la fiche.
+- Téléchargement `GET rh/{module}/{id}/pdf` : authentifié, policy `view` du module (périmètre, sanctions renforcées), contrôle d'intégrité par empreinte.
+- Signature : `SignatureProviderInterface` + `SignatureInterne` (mention approbateur/validateur/date, empreinte HMAC liée à la référence, à l'agent et à l'approbation, vérifiable). Bloc ajouté automatiquement si le modèle ne place pas `{{ signature }}`.
+- Délai de renouvellement des documents : `EnregistrementRhService` refuse un nouveau document du même type pour le même agent dans la fenêtre du délai du type (90 jours pour attestation de travail, certificat de travail, attestation de salaire) ; les documents rejetés ou expirés ne comptent pas.
+- Administration : 6 écrans « Types » et 6 écrans « Modèles » (groupe « Types et modèles »), lecture pour le personnel RH, écriture réservée (`referentiels.manage`). Éditeur HTML avec liste des variables, validation, aperçu en cadre isolé (`sandbox`), critères d'évaluation (répéteur), version affichée, un seul modèle par défaut par type.
+- Tests : 41 nouveaux (`PdfEtModelesTest`).
+
+### Hypothèses Phase 5
+- La signature interne n'est pas une signature électronique qualifiée ; l'interface permet de brancher un prestataire plus tard.
+- Le worker de file doit tourner en exploitation (`php artisan queue:work`) ; documenté en Phase 10. Sans worker, le PDF reste « en attente » et peut être relancé.
+- Les tests utilisent `QUEUE_CONNECTION=database` (jobs jamais exécutés) et un disque `private` factice.
+- Le champ `date_du_jour` des modèles est figé au moment de la génération.
+- Types sans modèle (`requires_model = false`) : aucun PDF.
+- Le code d'un type n'est plus modifiable après création (identifiant stable).
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).

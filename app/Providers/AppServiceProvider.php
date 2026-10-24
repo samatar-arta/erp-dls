@@ -14,6 +14,8 @@ use App\Models\Societe;
 use App\Models\TypeContrat;
 use App\Models\User;
 use App\Policies\EmployePolicy;
+use App\Services\Signature\SignatureInterne;
+use App\Services\Signature\SignatureProviderInterface;
 use App\Policies\EnregistrementRhPolicy;
 use App\Policies\OrganisationPolicy;
 use App\Policies\ReferentielPolicy;
@@ -27,7 +29,8 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Signature interne par défaut ; un fournisseur externe s'y substitue par simple changement de liaison.
+        $this->app->bind(SignatureProviderInterface::class, SignatureInterne::class);
     }
 
     public function boot(): void
@@ -38,6 +41,12 @@ class AppServiceProvider extends ServiceProvider
 
         foreach (ModuleRh::cases() as $module) {
             Gate::policy($module->enregistrementClass(), $module === ModuleRh::Sanction ? SanctionPolicy::class : EnregistrementRhPolicy::class);
+        }
+
+        // Types et modèles de chaque module : administrables comme les autres référentiels.
+        foreach (ModuleRh::cases() as $module) {
+            Gate::policy($module->typeClass(), ReferentielPolicy::class);
+            Gate::policy($module->modeleClass(), ReferentielPolicy::class);
         }
 
         Gate::policy(User::class, UserPolicy::class);

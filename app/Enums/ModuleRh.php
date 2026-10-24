@@ -48,6 +48,18 @@ enum ModuleRh: string
         throw new \InvalidArgumentException('Enregistrement hors des six modules RH : '.$objet::class);
     }
 
+    /** Module auquel appartient un modèle HTML (ModelDocument, ModelConge...). */
+    public static function pourModele(\Illuminate\Database\Eloquent\Model $modele): self
+    {
+        foreach (self::cases() as $module) {
+            if ($modele instanceof ($module->modeleClass())) {
+                return $module;
+            }
+        }
+
+        throw new \InvalidArgumentException('Modèle hors des six modules RH : '.$modele::class);
+    }
+
     /** @return array<string, class-string<\Illuminate\Database\Eloquent\Model>> alias => classe */
     public static function morphMap(): array
     {
