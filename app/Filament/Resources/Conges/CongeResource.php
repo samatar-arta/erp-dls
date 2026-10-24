@@ -10,6 +10,8 @@ use App\Filament\Resources\Conges\Pages\EditConge;
 use App\Filament\Resources\Conges\Pages\ListConges;
 use App\Filament\Resources\Conges\Pages\ViewConge;
 use App\Filament\Resources\ModulesRh\ModuleRhResource;
+use App\Models\TypeConge;
+use App\Services\CongeService;
 use BackedEnum;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
@@ -38,7 +40,8 @@ class CongeResource extends ModuleRhResource
         return [
             DatePicker::make('date_debut')->label('Début')->required()->live()->afterStateUpdated(fn (Get $get, Set $set) => static::calculerJours($get, $set)),
             DatePicker::make('date_fin')->label('Fin')->required()->afterOrEqual('date_debut')->live()->afterStateUpdated(fn (Get $get, Set $set) => static::calculerJours($get, $set)),
-            TextInput::make('nbre_jours')->label('Nombre de jours')->numeric()->required()->minValue(0.5)->step(0.5)->helperText('Calcul provisoire en jours calendaires ; le calcul définitif (jours ouvrés, fériés, solde) arrive en Phase 6.'),
+            TextInput::make('nbre_jours')->label('Nombre de jours')->readOnly()->dehydrated(false)
+                ->helperText('Calculé selon le type (jours calendaires ou ouvrés, jours fériés exclus). Le solde et les chevauchements sont contrôlés à l\'enregistrement.'),
             Textarea::make('motif')->label('Motif')->maxLength(2000)->columnSpanFull(),
         ];
     }
@@ -53,13 +56,17 @@ class CongeResource extends ModuleRhResource
         ];
     }
 
-    /** Calcul provisoire (jours calendaires inclusifs) ; remplacé par le service de congés en Phase 6. */
+    /** Aperçu du calcul ; le nombre de jours est de toute façon recalculé par le service à l'enregistrement. */
     private static function calculerJours(Get $get, Set $set): void
     {
         $debut = $get('date_debut');
         $fin = $get('date_fin');
-        if ($debut && $fin && $fin >= $debut) {
-            $set('nbre_jours', Carbon::parse($debut)->diffInDays(Carbon::parse($fin)) + 1);
+        $type = TypeConge::query()->find($get('type_conge_id'));
+
+        if (! $debut || ! $fin || $type === null || $fin < $debut) {
+            return;
         }
+
+        $set('nbre_jours', app(CongeService::class)->calculerJours($type, Carbon::parse($debut), Carbon::parse($fin)));
     }
 }

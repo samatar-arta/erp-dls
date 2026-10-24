@@ -7,8 +7,10 @@ namespace App\Services;
 use App\Enums\ModuleRh;
 use App\Enums\WorkflowStatut;
 use App\Exceptions\RegleMetierException;
+use App\Models\Conge;
 use App\Models\Document;
 use App\Models\Employe;
+use App\Models\TypeConge;
 use App\Models\TypeDocument;
 use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -23,8 +25,10 @@ use Illuminate\Support\Facades\Gate;
  */
 class EnregistrementRhService
 {
-    public function __construct(private readonly PerimetreService $perimetre)
-    {
+    public function __construct(
+        private readonly PerimetreService $perimetre,
+        private readonly CongeService $conges,
+    ) {
     }
 
     /**
@@ -78,6 +82,15 @@ class EnregistrementRhService
                 throw new RegleMetierException('Seul un brouillon peut être modifié.');
             }
 
+            if ($enregistrement instanceof Conge) {
+                // Le nombre de jours est toujours recalculé par le serveur à partir des dates et du type.
+                $donnees['nbre_jours'] = $this->calculerJoursConge(
+                    $donnees + $enregistrement->only(['type_conge_id', 'date_debut', 'date_fin']),
+                    $enregistrement->matricule,
+                    (int) $enregistrement->getKey(),
+                );
+            }
+
             $enregistrement->fill($donnees)->save();
 
             return $enregistrement;
@@ -119,6 +132,22 @@ class EnregistrementRhService
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $donnees
+     */
+    private function calculerJoursConge(array $donnees, string $matricule, ?int $ignorerCongeId = null): float
+    {
+        $type = TypeConge::query()->findOrFail($donnees['type_conge_id'] ?? null);
+
+        return $this->conges->preparer(
+            $matricule,
+            $type,
+            Carbon::parse($donnees['date_debut']),
+            Carbon::parse($donnees['date_fin']),
+            $ignorerCongeId,
+        );
+    }
+
     private function employeAccessible(string $matricule, User $acteur): Employe
     {
         $employe = Employe::query()->where('matricule', $matricule)->first();
@@ -144,6 +173,7 @@ class EnregistrementRhService
                 break;
             case ModuleRh::Conge:
                 $donnees['user_id'] = $acteur->getKey();
+                $donnees['nbre_jours'] = $this->calculerJoursConge($donnees, $employe->matricule);
                 break;
             case ModuleRh::Evaluation:
                 $donnees['evaluateur_id'] ??= $acteur->getKey();

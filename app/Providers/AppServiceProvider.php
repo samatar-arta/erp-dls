@@ -8,8 +8,10 @@ use App\Enums\ModuleRh;
 use App\Models\Departement;
 use App\Models\Employe;
 use App\Models\Grade;
+use App\Models\JourFerie;
 use App\Models\SiteAffectation;
 use App\Models\SiteDepartement;
+use App\Models\SoldeConge;
 use App\Models\Societe;
 use App\Models\TypeContrat;
 use App\Models\User;
@@ -20,6 +22,7 @@ use App\Policies\EnregistrementRhPolicy;
 use App\Policies\OrganisationPolicy;
 use App\Policies\ReferentielPolicy;
 use App\Policies\SanctionPolicy;
+use App\Policies\SoldeCongePolicy;
 use App\Policies\UserPolicy;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Gate;
@@ -56,7 +59,9 @@ class AppServiceProvider extends ServiceProvider
             Gate::policy($modele, OrganisationPolicy::class);
         }
 
-        foreach ([TypeContrat::class, Grade::class] as $modele) {
+        Gate::policy(SoldeConge::class, SoldeCongePolicy::class);
+
+        foreach ([TypeContrat::class, Grade::class, JourFerie::class] as $modele) {
             Gate::policy($modele, ReferentielPolicy::class);
         }
     }

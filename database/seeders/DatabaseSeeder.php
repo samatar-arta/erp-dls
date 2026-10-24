@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             RolesAndPermissionsSeeder::class,
             OrganisationSeeder::class,
             ModulesRhSeeder::class,
+            JoursFeriesSeeder::class,
             ReferencesSeeder::class,
         ]);
     }

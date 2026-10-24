@@ -165,6 +165,9 @@ class WorkflowTest extends TestCase
         $second = $this->brouillon(ModuleRh::Conge);
         $this->assertLessThan($second->id, $premier->id);
 
+        // Deux congés du même agent ne peuvent pas se chevaucher (Phase 6).
+        $second->update(['date_debut' => '2026-04-06', 'date_fin' => '2026-04-10']);
+
         // On approuve d'abord le second : il reçoit 0001.
         $this->jusquAApprobation($second);
         $this->service->approuver($second, $this->admin);

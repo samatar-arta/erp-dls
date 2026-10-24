@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 5 terminée — en attente de validation avant la Phase 6
+## Phase en cours : Phase 6 terminée — en attente de validation avant la Phase 7
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -89,6 +89,28 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Le champ `date_du_jour` des modèles est figé au moment de la génération.
 - Types sans modèle (`requires_model = false`) : aucun PDF.
 - Le code d'un type n'est plus modifiable après création (identifiant stable).
+
+### Phase 6 — fait (congés : jours, fériés, soldes) — en attente de validation
+- `CongeService` : calcul des jours par type (`mode_calcul` : calendaire = tous les jours inclus ; ouvré = hors jours non ouvrés et jours fériés), ventilé par année civile ; contrôle des chevauchements ; contrôle et débit du solde.
+- `EnregistrementRhService` : `nbre_jours` n'est plus saisi, il est recalculé par le serveur à la création et à chaque modification d'un brouillon (le champ de l'écran est en lecture seule, avec aperçu).
+- Tables `jours_feries` (date unique, libellé, récurrent, actif) et `soldes_conges` (agent, type, année : acquis, report, pris ; unique). `SoldeConge` : seuls acquis et report sont assignables ; `jours_pris` n'évolue que par l'approbation.
+- Solde : vérifié à la création/modification (solde restant moins les jours déjà engagés dans le circuit), à la soumission, puis à l'approbation sous verrou (INSERT … ON DUPLICATE KEY UPDATE puis lecture verrouillante, dans la transaction du workflow). Un solde insuffisant à l'approbation annule l'approbation entière (pas de référence, pas de PDF). Débit uniquement à l'approbation ; un rejet ne débite rien.
+- Écrans : « Jours fériés » (groupe Référentiels, écriture `referentiels.manage`) et « Soldes de congés » (groupe Gestion RH, lecture dans le périmètre, ajustement acquis/report réservé à `referentiels.manage`, donc ADMIN et RH_MANAGER). `SoldeCongePolicy` : création et suppression interdites.
+- `JoursFeriesSeeder` : fêtes à date fixe (1er janvier, 1er mai, 27 juin), récurrentes.
+- Tests : 26 nouveaux (`CongesTest`).
+
+### Hypothèses Phase 6 (le cahier des charges n'était pas disponible : à valider)
+- Jours non ouvrés = vendredi seulement (`config/conges.php`, variable `CONGES_JOURS_NON_OUVRES`, numéros ISO ; « 5,6 » pour vendredi + samedi).
+- Jours fériés exclus du décompte seulement pour les types en jours ouvrés ; en jours calendaires, ils comptent.
+- Fêtes religieuses (dates mobiles) non pré-remplies : à saisir chaque année dans l'écran « Jours fériés ». Noël et autres fêtes non incluses faute de liste officielle fournie.
+- Seuls les types avec un droit annuel > 0 (aujourd'hui : congé annuel, 30 jours) sont soumis au solde ; les autres ne génèrent aucune ligne de solde.
+- Droit annuel complet attribué à la première utilisation de l'année (pas de prorata à l'embauche, pas d'acquisition mensuelle) ; report des années précédentes saisi à la main (pas de report automatique).
+- Congé à cheval sur deux années : débit ventilé par année, chaque année contrôlée sur son propre solde.
+- Demi-journées non gérées (les jours sont entiers).
+- Chevauchement : tout congé non rejeté et non expiré du même agent, tous types confondus, bloque la période.
+- Pas de réintégration du solde après approbation (le circuit n'a pas d'annulation d'un congé approuvé).
+- Pas de test de concurrence multi-processus sur le débit du solde (le verrou suit le schéma validé de `ReferenceService`).
+- Migration `2026_10_28_000019` non encore appliquée sur la base de développement `erp_rh_dls` (tests : base `erp_rh_dls_test`).
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).

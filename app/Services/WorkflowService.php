@@ -9,6 +9,7 @@ use App\Enums\WorkflowAction;
 use App\Enums\WorkflowStatut;
 use App\Exceptions\RegleMetierException;
 use App\Jobs\GenererPdfJob;
+use App\Models\Conge;
 use App\Models\Employe;
 use App\Models\User;
 use App\Models\Workflow;
@@ -32,6 +33,7 @@ class WorkflowService
         private readonly ReferenceService $references,
         private readonly PerimetreService $perimetre,
         private readonly GenerationPdfService $pdf,
+        private readonly CongeService $conges,
     ) {}
 
     public function executer(WorkflowAction $action, Model $objet, ?User $acteur, ?string $commentaire = null): Workflow
@@ -234,6 +236,9 @@ class WorkflowService
         switch ($action) {
             case WorkflowAction::Soumettre:
                 $workflow->forceFill(['soumis_par_id' => $acteur?->getKey()]);
+                if ($objet instanceof Conge) {
+                    $this->conges->verifierPourSoumission($objet);
+                }
                 break;
             case WorkflowAction::Valider:
                 $workflow->forceFill(['valide_par_id' => $acteur?->getKey()]);
@@ -247,6 +252,9 @@ class WorkflowService
                 break;
             case WorkflowAction::Approuver:
                 $workflow->forceFill(['approuve_par_id' => $acteur?->getKey()]);
+                if ($objet instanceof Conge) {
+                    $this->conges->debiterALApprobation($objet);
+                }
                 $this->attribuerReference($objet);
                 $this->pdf->planifier($objet);
                 break;
