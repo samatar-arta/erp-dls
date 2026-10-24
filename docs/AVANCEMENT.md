@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 7 terminée — en attente de validation avant la Phase 8
+## Phase en cours : Phase 8 terminée — en attente de validation avant la Phase 9
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -129,6 +129,16 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Le périmètre de l'approbateur n'est pas recontrôlé sur la nouvelle affectation (seuls ADMIN et RH_MANAGER approuvent, accès global) ; le périmètre du créateur est contrôlé à la création.
 - Les effets différés attendent le planificateur (Phase 8) ou un lancement manuel de la commande.
 - Migration `2026_10_29_000020` non encore appliquée sur la base de développement `erp_rh_dls`.
+
+### Phase 8 — fait (planificateur) — en attente de validation
+- Commande `php artisan dls:expirer-workflows` (appelle `WorkflowService::expirerEchus()` : étapes en attente dont l'échéance est dépassée passent à EXPIRE, sans acteur, historique conservé, aucune référence attribuée).
+- Planification (`routes/console.php`, fuseau Africa/Djibouti) : `dls:expirer-workflows` chaque heure ; `dls:appliquer-effets` chaque jour à 00:05 ; sans chevauchement.
+- Tests : 2 nouveaux (`PlanificateurTest`).
+
+### Hypothèses Phase 8 (à valider — cahier des charges indisponible)
+- Périmètre limité aux deux tâches annoncées par les phases précédentes (expiration des délais, effets différés). Pas de relance automatique des PDF en attente ni de notifications d'échéance.
+- En exploitation, `php artisan schedule:run` doit être lancé chaque minute (Planificateur de tâches Windows ou cron) et un worker `php artisan queue:work` doit tourner : mise en place documentée en Phase 10.
+- Un congé qui expire ne touche pas au solde (le débit n'a lieu qu'à l'approbation).
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
