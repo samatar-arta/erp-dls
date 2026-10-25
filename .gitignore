@@ -26,3 +26,4 @@ yarn-error.log
 /.zed
 
 /storage/framework/lsp-*.php
+/package-lock.json
