@@ -67,6 +67,7 @@ trait CreeOrganisation
 
     protected function employeDans(SiteDepartement $sd): Employe
     {
-        return Employe::factory()->pourSiteDepartement($sd)->create();
+        // Embauche fixe : les tests utilisent des dates d'effet fixes (2026), une date aléatoire les rendrait intermittents.
+        return Employe::factory()->pourSiteDepartement($sd)->create(['date_embauche' => '2020-01-01']);
     }
 }
