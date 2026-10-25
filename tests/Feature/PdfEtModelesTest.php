@@ -353,7 +353,7 @@ class PdfEtModelesTest extends TestCase
 
     public function test_module_inconnu_donne_404(): void
     {
-        $this->actingAs($this->admin)->get('/rh/PAYLIST/1/pdf')->assertNotFound();
+        $this->actingAs($this->admin)->get('/erp/documents/PAYLIST/1/pdf')->assertNotFound();
     }
 
     // ----------------------------------------------------------- délai de renouvellement

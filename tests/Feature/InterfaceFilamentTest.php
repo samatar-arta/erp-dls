@@ -33,7 +33,7 @@ class InterfaceFilamentTest extends TestCase
 
     public function test_page_de_connexion_accessible(): void
     {
-        $this->get('/admin/login')->assertOk();
+        $this->get('/erp/login')->assertOk();
     }
 
     public function test_admin_et_rh_manager_acces_a_toutes_les_pages_de_liste(): void
@@ -62,7 +62,7 @@ class InterfaceFilamentTest extends TestCase
         $user = $this->utilisateur(RoleName::Admin);
         $user->forceFill(['is_active' => false])->saveQuietly();
 
-        $this->actingAs($user->fresh())->get('/admin')->assertForbidden();
+        $this->actingAs($user->fresh())->get('/erp')->assertForbidden();
     }
 
     public function test_creation_d_un_utilisateur_avec_roles_et_perimetre(): void

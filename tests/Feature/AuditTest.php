@@ -174,7 +174,7 @@ class AuditTest extends TestCase
 
     public function test_connexions_et_echecs_sont_journalises(): void
     {
-        $this->post('/admin/login');
+        $this->post('/erp/login');
 
         Event::dispatch(new Failed('web', null, ['email' => 'inconnu@example.test', 'password' => 'motdepasse']));
 
