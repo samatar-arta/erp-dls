@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\DB;
  */
 class UserManagementService
 {
+    public function __construct(private readonly AuditService $audit)
+    {
+    }
+
     /**
      * @param  list<string>  $roles
      */
@@ -28,7 +32,7 @@ class UserManagementService
             throw new RegleMetierException('Rôle inconnu : '.implode(', ', $invalides));
         }
 
-        DB::transaction(function () use ($cible, $roles): void {
+        DB::transaction(function () use ($acteur, $cible, $roles): void {
             // Verrou pour sérialiser les retraits concurrents de rôles globaux.
             User::query()->whereIn('id', $this->idsGlobauxActifs())->lockForUpdate()->get();
 
@@ -40,7 +44,13 @@ class UserManagementService
                 $this->verifierNonDernierAdmin($cible);
             }
 
+            $avant = $cible->roles()->pluck('name')->sort()->values()->all();
             $cible->syncRoles($roles);
+            $apres = collect($roles)->sort()->values()->all();
+
+            if ($avant !== $apres) {
+                $this->audit->journaliser('utilisateur.roles_modifies', $cible, "Rôles de {$cible->name} modifiés.", ['avant' => $avant, 'apres' => $apres], $acteur);
+            }
         });
     }
 
@@ -51,7 +61,13 @@ class UserManagementService
     {
         $this->interdireAutoModification($acteur, $cible, 'ses propres affectations');
 
+        $avant = $cible->siteDepartements()->pluck('site_departements.id')->sort()->values()->all();
         $cible->siteDepartements()->sync($siteDepartementIds);
+        $apres = collect($siteDepartementIds)->map(fn ($id): int => (int) $id)->sort()->values()->all();
+
+        if ($avant !== $apres) {
+            $this->audit->journaliser('utilisateur.perimetre_modifie', $cible, "Périmètre de {$cible->name} modifié.", ['avant' => $avant, 'apres' => $apres], $acteur);
+        }
     }
 
     public function definirActif(User $acteur, User $cible, bool $actif): void
@@ -60,13 +76,15 @@ class UserManagementService
             throw new RegleMetierException('Vous ne pouvez pas désactiver votre propre compte.');
         }
 
-        DB::transaction(function () use ($cible, $actif): void {
+        DB::transaction(function () use ($acteur, $cible, $actif): void {
             if (! $actif) {
                 User::query()->whereIn('id', $this->idsGlobauxActifs())->lockForUpdate()->get();
             }
 
             $cible->is_active = $actif;
             $cible->save();
+
+            $this->audit->journaliser($actif ? 'utilisateur.active' : 'utilisateur.desactive', $cible, "Compte de {$cible->name} ".($actif ? 'activé' : 'désactivé').'.', [], $acteur);
         });
     }
 

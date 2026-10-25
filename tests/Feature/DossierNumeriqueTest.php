@@ -48,6 +48,12 @@ class DossierNumeriqueTest extends TestCase
             ->get(route('employes.fichiers.telecharger', [$employe, $fichier]))
             ->assertOk()
             ->assertDownload('cv.txt');
+
+        // Le téléchargement est tracé (agent identifié par matricule), sans le nom ni le chemin du fichier.
+        $log = \App\Models\AuditLog::query()->where('action', 'employe.fichier_telecharge')->firstOrFail();
+        $this->assertSame($user->id, $log->user_id);
+        $this->assertSame($employe->matricule, $log->cible_id);
+        $this->assertStringNotContainsString('cv.txt', json_encode($log->toArray(), JSON_THROW_ON_ERROR));
     }
 
     public function test_telechargement_refuse_hors_perimetre(): void

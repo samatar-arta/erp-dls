@@ -35,6 +35,7 @@ class WorkflowService
         private readonly GenerationPdfService $pdf,
         private readonly CongeService $conges,
         private readonly EffetsRhService $effets,
+        private readonly AuditService $audit,
     ) {}
 
     public function executer(WorkflowAction $action, Model $objet, ?User $acteur, ?string $commentaire = null): Workflow
@@ -75,6 +76,20 @@ class WorkflowService
             $workflow->forceFill(['statut' => $action->vers()]);
             $workflow->forceFill(['echeance_at' => $this->nouvelleEcheance($action->vers())]);
             $workflow->save();
+
+            $this->audit->journaliser(
+                'workflow.'.strtolower($action->value),
+                $objet,
+                sprintf('%s : %s (%s → %s).', ModuleRh::pourEnregistrement($objet)->libelleSingulier(), $action->label(), $courant->label(), $action->vers()->label()),
+                [
+                    'module' => ModuleRh::pourEnregistrement($objet)->value,
+                    'matricule' => $objet->getAttribute('matricule'),
+                    'reference' => $objet->getAttribute('reference'),
+                    'de_statut' => $courant->value,
+                    'vers_statut' => $action->vers()->value,
+                ],
+                $acteur,
+            );
 
             $historique = new WorkflowHistory;
             $historique->forceFill([

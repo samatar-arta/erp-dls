@@ -311,6 +311,10 @@ class PdfEtModelesTest extends TestCase
             ->get(route('enregistrements.pdf', ['DOCUMENT', $objet->id]))
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
+
+        $log = \App\Models\AuditLog::query()->where('action', 'pdf.telecharge')->firstOrFail();
+        $this->assertSame($this->valideur->id, $log->user_id);
+        $this->assertSame($objet->fresh()->reference, $log->donnees['reference']);
     }
 
     public function test_telechargement_refuse_hors_perimetre_et_sans_connexion(): void

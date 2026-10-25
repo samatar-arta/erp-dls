@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class EmployeService
 {
-    public function __construct(private readonly PerimetreService $perimetre)
+    public function __construct(private readonly PerimetreService $perimetre, private readonly AuditService $audit)
     {
     }
 
@@ -42,6 +42,8 @@ class EmployeService
                 'source' => 'creation',
                 'cree_par' => $acteur->getKey(),
             ]);
+
+            $this->audit->journaliser('employe.cree', $employe, "Agent {$employe->matricule} créé.", [], $acteur);
 
             return $employe;
         });
@@ -97,6 +99,15 @@ class EmployeService
             } finally {
                 Employe::$autoriserChangementAffectation = false;
             }
+
+            $this->audit->journaliser('employe.affectation_changee', $employe, "Affectation de l'agent {$employe->matricule} modifiée ({$source}).", [
+                'source' => $source,
+                'date_effet' => $dateEffet->toDateString(),
+                'societe_id' => (int) $nouvelle['societe_id'],
+                'site_id' => (int) $nouvelle['site_id'],
+                'departement_id' => (int) $nouvelle['departement_id'],
+                'fonction' => $fonction,
+            ], $acteur);
 
             return $employe;
         });

@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 8 terminée — en attente de validation avant la Phase 9
+## Phase en cours : Phase 9 terminée — en attente de validation avant la Phase 10
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -140,10 +140,25 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - En exploitation, `php artisan schedule:run` doit être lancé chaque minute (Planificateur de tâches Windows ou cron) et un worker `php artisan queue:work` doit tourner : mise en place documentée en Phase 10.
 - Un congé qui expire ne touche pas au solde (le débit n'a lieu qu'à l'approbation).
 
+### Phase 9 — fait (journal d'audit) — en attente de validation
+- Table `audit_logs` en ajout seul (`AuditLog` : modification et suppression refusées pour tous les rôles, rien d'assignable en masse). Colonnes : acteur (id + nom figé), action, objet (type + identifiant ; l'agent est identifié par son matricule), description, données JSON, IP, user-agent, date.
+- `AuditService::journaliser()` : acteur pris sur l'utilisateur connecté (ou passé explicitement) ; clés sensibles retirées des données (mot de passe, CNI, CNSS, téléphone, adresse, salaires, contenus de modèles).
+- Événements tracés : rôles (avant/après), périmètre (avant/après), activation / désactivation, création et modification de comptes (noms de champs seulement, jamais le mot de passe) ; création, modification de fiche (noms de champs seulement), changement d'affectation, ajout / suppression / téléchargement de fichiers du dossier numérique ; chaque action du workflow (avec module, matricule, référence, statuts) ; téléchargement des PDF ; création et modification des modèles (champs touchés et version, jamais le contenu) ; ajustements et débits des soldes de congés (avant/après) ; connexions, déconnexions et échecs de connexion (adresse e-mail saisie seulement).
+- Les écritures du journal sont dans la même transaction que l'action : une action annulée ne laisse aucune trace.
+- Écran « Journal d'audit » (groupe Administration), lecture seule avec filtres action / objet, réservé à la permission `audit.view` (ADMIN et RH_MANAGER) via `AuditLogPolicy` ; aucune création, modification ni suppression possible.
+- Tests : 17 nouveaux (`AuditTest`) + assertions ajoutées aux tests de téléchargement.
+
+### Hypothèses Phase 9 (à valider — cahier des charges indisponible)
+- Pas de purge ni d'archivage du journal ; pas d'export. Aucune lecture simple (consultation d'une fiche, d'une sanction) n'est tracée : seuls les téléchargements le sont.
+- Les valeurs des champs d'une fiche agent ne sont pas journalisées (données personnelles) : seulement les noms des champs modifiés.
+- Le journal échoue « fermé » dans les transactions métier (si l'écriture échoue, l'action est annulée), sauf pour les connexions, où une panne du journal ne bloque pas l'accès (erreur écrite dans les logs applicatifs).
+- Une expiration automatique lancée par la console n'a pas d'acteur ; lancée depuis une session connectée, elle porterait l'utilisateur de la session.
+- Migration `2026_10_30_000021` non encore appliquée sur la base de développement `erp_rh_dls`.
+
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
 - Ressource Filament Employés complète (onglets, dossier numérique) : Phase 4.
-- Journalisation d'audit des changements de rôles : Phase 9 (AuditService).
+- Journalisation d'audit des changements de rôles : fait en Phase 9 (AuditService).
 
 ## Hypothèses / écarts
 - Serveur de dev = MariaDB 10.4.32 (pas MySQL 8) ; driver `mariadb`.

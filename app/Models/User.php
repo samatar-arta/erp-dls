@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\RoleName;
+use App\Services\AuditService;
 use App\Services\UserManagementService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
@@ -46,6 +47,18 @@ class User extends Authenticatable implements FilamentUser
         static::updating(static function (User $user): void {
             if ($user->isDirty('is_active') && ! $user->is_active) {
                 app(UserManagementService::class)->verifierNonDernierAdmin($user);
+            }
+        });
+
+        static::created(static function (User $user): void {
+            app(AuditService::class)->journaliser('utilisateur.cree', $user, "Compte {$user->name} créé.");
+        });
+
+        // Noms des champs seulement : jamais les valeurs (le mot de passe n'apparaît nulle part).
+        static::updated(static function (User $user): void {
+            $champs = array_values(array_intersect(array_keys($user->getChanges()), ['name', 'email', 'password']));
+            if ($champs !== []) {
+                app(AuditService::class)->journaliser('utilisateur.modifie', $user, "Compte {$user->name} modifié.", ['champs' => $champs]);
             }
         });
     }

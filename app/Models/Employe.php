@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Exceptions\RegleMetierException;
+use App\Services\AuditService;
 use App\Services\PerimetreService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -49,6 +50,19 @@ class Employe extends Model
                 throw new RegleMetierException(
                     "L'affectation d'un employé ne se modifie que par une mutation ou une promotion approuvée."
                 );
+            }
+        });
+
+        // Modifications de la fiche : noms des champs seulement (jamais les valeurs, souvent personnelles).
+        // Les changements d'affectation sont journalisés par EmployeService.
+        static::updated(static function (Employe $employe): void {
+            if (self::$autoriserChangementAffectation) {
+                return;
+            }
+
+            $champs = array_values(array_diff(array_keys($employe->getChanges()), ['updated_at']));
+            if ($champs !== []) {
+                app(AuditService::class)->journaliser('employe.modifie', $employe, "Fiche de l'agent {$employe->matricule} modifiée.", ['champs' => $champs]);
             }
         });
     }

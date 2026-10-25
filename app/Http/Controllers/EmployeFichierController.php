@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Employe;
 use App\Models\EmployeFichier;
+use App\Services\AuditService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,7 +16,7 @@ class EmployeFichierController extends Controller
     /**
      * Téléchargement authentifié et autorisé d'un fichier du dossier numérique (disque privé).
      */
-    public function telecharger(Employe $employe, EmployeFichier $fichier): StreamedResponse
+    public function telecharger(Employe $employe, EmployeFichier $fichier, AuditService $audit): StreamedResponse
     {
         Gate::authorize('viewFichiers', $employe);
 
@@ -23,6 +24,8 @@ class EmployeFichierController extends Controller
             $fichier->employe_id === $employe->getKey() && Storage::disk('private')->exists($fichier->path),
             404,
         );
+
+        $audit->journaliser('employe.fichier_telecharge', $employe, "Fichier du dossier de l'agent {$employe->matricule} téléchargé.", ['fichier_id' => $fichier->getKey(), 'categorie' => $fichier->categorie?->value]);
 
         return Storage::disk('private')->download($fichier->path, $fichier->nom_original);
     }

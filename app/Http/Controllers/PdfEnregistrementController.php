@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Enums\ModuleRh;
+use App\Services\AuditService;
 use App\Services\GenerationPdfService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
@@ -16,7 +17,7 @@ class PdfEnregistrementController extends Controller
      * Téléchargement authentifié du PDF archivé : droit de lecture du module + périmètre (policy `view`),
      * fichier sur le disque privé, intégrité contrôlée par l'empreinte.
      */
-    public function telecharger(string $module, int $id, GenerationPdfService $service): StreamedResponse
+    public function telecharger(string $module, int $id, GenerationPdfService $service, AuditService $audit): StreamedResponse
     {
         $moduleRh = ModuleRh::tryFrom(strtoupper($module));
         abort_if($moduleRh === null, 404);
@@ -26,6 +27,8 @@ class PdfEnregistrementController extends Controller
         Gate::authorize('view', $enregistrement);
 
         abort_unless($service->pdfValide($enregistrement), 404, 'PDF non disponible.');
+
+        $audit->journaliser('pdf.telecharge', $enregistrement, "PDF {$enregistrement->reference} téléchargé.", ['module' => $moduleRh->value, 'reference' => $enregistrement->reference]);
 
         $nom = str_replace(['/', '\\'], '-', (string) $enregistrement->reference).'.pdf';
 

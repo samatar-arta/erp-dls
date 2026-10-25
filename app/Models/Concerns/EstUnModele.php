@@ -6,6 +6,7 @@ namespace App\Models\Concerns;
 
 use App\Enums\ModuleRh;
 use App\Exceptions\RegleMetierException;
+use App\Services\AuditService;
 use App\Services\TemplateRendererService;
 use App\Support\HtmlSanitizer;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,6 +49,21 @@ trait EstUnModele
                     ->where('is_default', true)
                     ->update(['is_default' => false]);
             }
+        });
+
+        // Modifications de modèles : champs touchés et version, jamais le contenu.
+        static::saved(static function (Model $modele): void {
+            $champs = array_values(array_diff(array_keys($modele->getChanges()), ['updated_at', 'created_at', 'id', 'defaut_type_id']));
+            if (! $modele->wasRecentlyCreated && $champs === []) {
+                return;
+            }
+
+            app(AuditService::class)->journaliser(
+                $modele->wasRecentlyCreated ? 'modele.cree' : 'modele.modifie',
+                $modele,
+                sprintf('Modèle « %s » %s.', $modele->titre, $modele->wasRecentlyCreated ? 'créé' : 'modifié'),
+                ['module' => ModuleRh::pourModele($modele)->value, 'version' => $modele->version, 'champs' => $champs],
+            );
         });
 
         static::updating(static function (Model $modele): void {

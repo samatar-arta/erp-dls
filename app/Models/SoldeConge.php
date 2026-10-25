@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\AuditService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -17,6 +18,20 @@ class SoldeConge extends Model
 
     /** @var list<string> */
     protected $fillable = ['jours_acquis', 'jours_report'];
+
+    protected static function booted(): void
+    {
+        // Tout changement (ajustement manuel ou débit à l'approbation) est tracé avec l'avant / après.
+        static::updated(static function (SoldeConge $solde): void {
+            $champs = array_intersect_key($solde->getChanges(), array_flip(['jours_acquis', 'jours_report', 'jours_pris']));
+            if ($champs !== []) {
+                app(AuditService::class)->journaliser('solde_conge.modifie', $solde, "Solde de congé {$solde->annee} de l'agent {$solde->matricule} modifié.", [
+                    'avant' => array_intersect_key($solde->getOriginal(), $champs),
+                    'apres' => $champs,
+                ]);
+            }
+        });
+    }
 
     protected function casts(): array
     {

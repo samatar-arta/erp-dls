@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Enums\ModuleRh;
+use App\Listeners\JournaliserAuthentification;
+use App\Models\AuditLog;
 use App\Models\Departement;
 use App\Models\Employe;
 use App\Models\Grade;
@@ -15,6 +17,7 @@ use App\Models\SoldeConge;
 use App\Models\Societe;
 use App\Models\TypeContrat;
 use App\Models\User;
+use App\Policies\AuditLogPolicy;
 use App\Policies\EmployePolicy;
 use App\Services\Signature\SignatureInterne;
 use App\Services\Signature\SignatureProviderInterface;
@@ -24,7 +27,11 @@ use App\Policies\ReferentielPolicy;
 use App\Policies\SanctionPolicy;
 use App\Policies\SoldeCongePolicy;
 use App\Policies\UserPolicy;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -60,6 +67,10 @@ class AppServiceProvider extends ServiceProvider
         }
 
         Gate::policy(SoldeConge::class, SoldeCongePolicy::class);
+        Gate::policy(AuditLog::class, AuditLogPolicy::class);
+
+        // Journal d'audit : connexions, déconnexions et échecs d'authentification.
+        Event::listen([Login::class, Logout::class, Failed::class], JournaliserAuthentification::class);
 
         foreach ([TypeContrat::class, Grade::class, JourFerie::class] as $modele) {
             Gate::policy($modele, ReferentielPolicy::class);
