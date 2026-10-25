@@ -1,6 +1,6 @@
 # Avancement
 
-## Phase en cours : Phase 9 terminée — en attente de validation avant la Phase 10
+## Phase en cours : Phase 10 terminée et validée
 
 ### Phase 0 (terminée, commit a330a6d)
 Projet Laravel 12, Filament v5, Spatie Permission 6, DomPDF, MariaDB, bases `erp_rh_dls` et `erp_rh_dls_test`.
@@ -153,7 +153,16 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Les valeurs des champs d'une fiche agent ne sont pas journalisées (données personnelles) : seulement les noms des champs modifiés.
 - Le journal échoue « fermé » dans les transactions métier (si l'écriture échoue, l'action est annulée), sauf pour les connexions, où une panne du journal ne bloque pas l'accès (erreur écrite dans les logs applicatifs).
 - Une expiration automatique lancée par la console n'a pas d'acteur ; lancée depuis une session connectée, elle porterait l'utilisateur de la session.
-- Migration `2026_10_30_000021` non encore appliquée sur la base de développement `erp_rh_dls`.
+- Migration `2026_10_30_000021` appliquée sur la base de développement `erp_rh_dls`.
+
+### Phase 10 — fait (mise en exploitation) — validée
+- `docs/EXPLOITATION.md` : mise en service, tâches permanentes, déploiement, sauvegarde/restauration, sécurité, dépannage.
+- `.env.production.example` (debug coupé, logs quotidiens, cookies sécurisés, disque `private`) ; `deploy/` : `planificateur.cmd`, `worker.cmd`, `optimiser.cmd`, `sauvegarde.ps1`.
+- Correctif de test : date d'embauche fixe des agents de test (échec intermittent, ~6 %, des effets de mutation/promotion).
+
+### Hypothèses Phase 10 (à valider — cahier des charges indisponible)
+- Validé : Windows + XAMPP, Planificateur de tâches, worker en service NSSM, sauvegarde conjointe base + storage/app/private. Tâches installées par l'exploitant, non automatisées depuis le dépôt. Scripts non exécutés sur un serveur de production.
+- Aucun système de supervision, de notification ni de restauration automatisée ; sauvegarde nocturne à planifier et à copier hors serveur.
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
