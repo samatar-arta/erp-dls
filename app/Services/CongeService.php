@@ -8,6 +8,7 @@ use App\Enums\ModeCalcul;
 use App\Enums\WorkflowStatut;
 use App\Exceptions\RegleMetierException;
 use App\Models\Conge;
+use App\Models\Employe;
 use App\Models\JourFerie;
 use App\Models\SoldeConge;
 use App\Models\TypeConge;
@@ -33,7 +34,7 @@ class CongeService
      *
      * @return array<int, float>
      */
-    public function joursParAnnee(TypeConge $type, Carbon $debut, Carbon $fin): array
+    public function joursParAnnee(TypeConge $type, Carbon $debut, Carbon $fin, bool $demiDebut = false, bool $demiFin = false): array
     {
         if ($fin->lt($debut)) {
             throw new RegleMetierException('La date de fin doit être postérieure ou égale à la date de début.');
@@ -48,23 +49,25 @@ class CongeService
             if ($ouvre && (in_array($jour->dayOfWeekIso, $nonOuvres, true) || $this->estFerie($jour, $feries))) {
                 continue;
             }
-            $parAnnee[$jour->year] = ($parAnnee[$jour->year] ?? 0) + 1.0;
+            // Demi-journée : le premier et/ou le dernier jour ne compte que pour 0,5 (une seule déduction si c'est le même jour).
+            $demi = ($demiDebut && $jour->isSameDay($debut)) || ($demiFin && $jour->isSameDay($fin));
+            $parAnnee[$jour->year] = ($parAnnee[$jour->year] ?? 0) + ($demi ? 0.5 : 1.0);
         }
 
         return $parAnnee;
     }
 
-    public function calculerJours(TypeConge $type, Carbon $debut, Carbon $fin): float
+    public function calculerJours(TypeConge $type, Carbon $debut, Carbon $fin, bool $demiDebut = false, bool $demiFin = false): float
     {
-        return array_sum($this->joursParAnnee($type, $debut, $fin));
+        return array_sum($this->joursParAnnee($type, $debut, $fin, $demiDebut, $demiFin));
     }
 
     /**
      * Contrôles et calcul à la création / modification d'un brouillon : renvoie le nombre de jours décompté.
      */
-    public function preparer(string $matricule, TypeConge $type, Carbon $debut, Carbon $fin, ?int $ignorerCongeId = null): float
+    public function preparer(string $matricule, TypeConge $type, Carbon $debut, Carbon $fin, ?int $ignorerCongeId = null, bool $demiDebut = false, bool $demiFin = false): float
     {
-        $parAnnee = $this->joursParAnnee($type, $debut, $fin);
+        $parAnnee = $this->joursParAnnee($type, $debut, $fin, $demiDebut, $demiFin);
         $total = array_sum($parAnnee);
 
         if ($total <= 0) {
@@ -81,7 +84,7 @@ class CongeService
     public function verifierPourSoumission(Conge $conge): void
     {
         $type = $conge->type;
-        $parAnnee = $this->joursParAnnee($type, $conge->date_debut, $conge->date_fin);
+        $parAnnee = $this->joursParAnnee($type, $conge->date_debut, $conge->date_fin, (bool) $conge->demi_debut, (bool) $conge->demi_fin);
 
         $this->verifierChevauchement($conge->matricule, $conge->date_debut, $conge->date_fin, (int) $conge->getKey());
         $this->verifierSolde($conge->matricule, $type, $parAnnee, (int) $conge->getKey());
@@ -98,7 +101,7 @@ class CongeService
             return;
         }
 
-        foreach ($this->joursParAnnee($type, $conge->date_debut, $conge->date_fin) as $annee => $jours) {
+        foreach ($this->joursParAnnee($type, $conge->date_debut, $conge->date_fin, (bool) $conge->demi_debut, (bool) $conge->demi_fin) as $annee => $jours) {
             $solde = $this->soldeVerrouille($conge->matricule, $type, $annee);
 
             if ($jours > $solde->restant() + 1e-9) {
@@ -121,7 +124,36 @@ class CongeService
             ->where(['matricule' => $matricule, 'type_conge_id' => $type->getKey(), 'annee' => $annee])
             ->first();
 
-        return $solde?->restant() ?? (float) $type->default_days_per_year;
+        return $solde?->restant() ?? $this->droitInitial($matricule, $type, $annee);
+    }
+
+    /**
+     * Droit annuel de l'année, au prorata de la date d'embauche (jours restants de l'année d'embauche, embauche
+     * incluse, arrondis à la demi-journée la plus proche). Aucun droit avant l'année d'embauche ; pas de report automatique.
+     */
+    public function droitInitial(string $matricule, TypeConge $type, int $annee): float
+    {
+        $droit = (float) $type->default_days_per_year;
+        $embauche = Employe::query()->where('matricule', $matricule)->value('date_embauche');
+
+        if ($embauche === null) {
+            return $droit;
+        }
+
+        $embauche = Carbon::parse($embauche)->startOfDay();
+
+        if ($embauche->year > $annee) {
+            return 0.0;
+        }
+
+        if ($embauche->year < $annee) {
+            return $droit;
+        }
+
+        $joursAnnee = $embauche->isLeapYear() ? 366 : 365;
+        $restants = $joursAnnee - $embauche->dayOfYear + 1;
+
+        return round($droit * $restants / $joursAnnee * 2) / 2;
     }
 
     /** Seuls les types dotés d'un droit annuel sont soumis au solde. */
@@ -185,7 +217,7 @@ class CongeService
             ->whereHas('workflow', fn ($q) => $q->whereIn('statut', $statuts))
             ->get()
             ->each(function (Conge $autre) use ($type, $annee, &$total): void {
-                $total += $this->joursParAnnee($type, $autre->date_debut, $autre->date_fin)[$annee] ?? 0.0;
+                $total += $this->joursParAnnee($type, $autre->date_debut, $autre->date_fin, (bool) $autre->demi_debut, (bool) $autre->demi_fin)[$annee] ?? 0.0;
             });
 
         return $total;
@@ -202,7 +234,7 @@ class CongeService
             'INSERT INTO soldes_conges (matricule, type_conge_id, annee, jours_acquis, jours_report, jours_pris, created_at, updated_at)
              VALUES (?, ?, ?, ?, 0, 0, ?, ?)
              ON DUPLICATE KEY UPDATE jours_pris = jours_pris',
-            [$matricule, $type->getKey(), $annee, (float) $type->default_days_per_year, $maintenant, $maintenant],
+            [$matricule, $type->getKey(), $annee, $this->droitInitial($matricule, $type, $annee), $maintenant, $maintenant],
         );
 
         return SoldeConge::query()

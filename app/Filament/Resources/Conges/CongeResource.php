@@ -16,6 +16,7 @@ use BackedEnum;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Icons\Heroicon;
@@ -40,6 +41,8 @@ class CongeResource extends ModuleRhResource
         return [
             DatePicker::make('date_debut')->label('Début')->required()->live()->afterStateUpdated(fn (Get $get, Set $set) => static::calculerJours($get, $set)),
             DatePicker::make('date_fin')->label('Fin')->required()->afterOrEqual('date_debut')->live()->afterStateUpdated(fn (Get $get, Set $set) => static::calculerJours($get, $set)),
+            Toggle::make('demi_debut')->label('Départ l\'après-midi (demi-journée le premier jour)')->live()->afterStateUpdated(fn (Get $get, Set $set) => static::calculerJours($get, $set)),
+            Toggle::make('demi_fin')->label('Retour l\'après-midi (demi-journée le dernier jour)')->live()->afterStateUpdated(fn (Get $get, Set $set) => static::calculerJours($get, $set)),
             TextInput::make('nbre_jours')->label('Nombre de jours')->readOnly()->dehydrated(false)
                 ->helperText('Calculé selon le type (jours calendaires ou ouvrés, jours fériés exclus). Le solde et les chevauchements sont contrôlés à l\'enregistrement.'),
             Textarea::make('motif')->label('Motif')->maxLength(2000)->columnSpanFull(),
@@ -51,6 +54,8 @@ class CongeResource extends ModuleRhResource
         return [
             'date_debut' => 'Début',
             'date_fin' => 'Fin',
+            'demi_debut' => 'Demi-journée au début',
+            'demi_fin' => 'Demi-journée à la fin',
             'nbre_jours' => 'Nombre de jours',
             'motif' => 'Motif',
         ];
@@ -67,6 +72,6 @@ class CongeResource extends ModuleRhResource
             return;
         }
 
-        $set('nbre_jours', app(CongeService::class)->calculerJours($type, Carbon::parse($debut), Carbon::parse($fin)));
+        $set('nbre_jours', app(CongeService::class)->calculerJours($type, Carbon::parse($debut), Carbon::parse($fin), (bool) $get('demi_debut'), (bool) $get('demi_fin')));
     }
 }

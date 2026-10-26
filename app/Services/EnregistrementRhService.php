@@ -89,7 +89,7 @@ class EnregistrementRhService
             if ($enregistrement instanceof Conge) {
                 // Le nombre de jours est toujours recalculé par le serveur à partir des dates et du type.
                 $donnees['nbre_jours'] = $this->calculerJoursConge(
-                    $donnees + $enregistrement->only(['type_conge_id', 'date_debut', 'date_fin']),
+                    $donnees + $enregistrement->only(['type_conge_id', 'date_debut', 'date_fin', 'demi_debut', 'demi_fin']),
                     $enregistrement->matricule,
                     (int) $enregistrement->getKey(),
                 );
@@ -196,6 +196,8 @@ class EnregistrementRhService
             Carbon::parse($donnees['date_debut']),
             Carbon::parse($donnees['date_fin']),
             $ignorerCongeId,
+            (bool) ($donnees['demi_debut'] ?? false),
+            (bool) ($donnees['demi_fin'] ?? false),
         );
     }
 

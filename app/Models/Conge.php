@@ -28,13 +28,15 @@ class Conge extends Model
     protected $table = 'conges';
 
     /** @var list<string> */
-    protected $fillable = ['matricule', 'type_conge_id', 'model_conge_id', 'user_id', 'date_debut', 'date_fin', 'nbre_jours', 'motif'];
+    protected $fillable = ['matricule', 'type_conge_id', 'model_conge_id', 'user_id', 'date_debut', 'date_fin', 'demi_debut', 'demi_fin', 'nbre_jours', 'motif'];
 
     protected function casts(): array
     {
         return [
             'date_debut' => 'date',
             'date_fin' => 'date',
+            'demi_debut' => 'boolean',
+            'demi_fin' => 'boolean',
             'nbre_jours' => 'decimal:1',
         ];
     }

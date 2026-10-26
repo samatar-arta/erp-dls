@@ -100,13 +100,13 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 - Tests : 26 nouveaux (`CongesTest`).
 
 ### Hypothèses Phase 6 (le cahier des charges n'était pas disponible : à valider)
-- Jours non ouvrés = vendredi seulement (`config/conges.php`, variable `CONGES_JOURS_NON_OUVRES`, numéros ISO ; « 5,6 » pour vendredi + samedi).
+- ~~Jours non ouvrés = vendredi seulement~~ : remplacé par les règles fermes de la Phase 11 (voir ci-dessous).
 - Jours fériés exclus du décompte seulement pour les types en jours ouvrés ; en jours calendaires, ils comptent.
-- Fêtes religieuses (dates mobiles) non pré-remplies : à saisir chaque année dans l'écran « Jours fériés ». Noël et autres fêtes non incluses faute de liste officielle fournie.
+- ~~Fêtes religieuses non pré-remplies~~ : liste 2026 fournie, voir Phase 11.
 - Seuls les types avec un droit annuel > 0 (aujourd'hui : congé annuel, 30 jours) sont soumis au solde ; les autres ne génèrent aucune ligne de solde.
-- Droit annuel complet attribué à la première utilisation de l'année (pas de prorata à l'embauche, pas d'acquisition mensuelle) ; report des années précédentes saisi à la main (pas de report automatique).
+- Droit annuel attribué à la première utilisation de l'année (pas d'acquisition mensuelle) ; prorata à l'embauche : voir Phase 11. Report saisi à la main (pas de report automatique, confirmé).
 - Congé à cheval sur deux années : débit ventilé par année, chaque année contrôlée sur son propre solde.
-- Demi-journées non gérées (les jours sont entiers).
+- ~~Demi-journées non gérées~~ : gérées depuis la Phase 11.
 - Chevauchement : tout congé non rejeté et non expiré du même agent, tous types confondus, bloque la période.
 - Pas de réintégration du solde après approbation (le circuit n'a pas d'annulation d'un congé approuvé).
 - Pas de test de concurrence multi-processus sur le débit du solde (le verrou suit le schéma validé de `ReferenceService`).
@@ -163,6 +163,23 @@ Incident : tables `mysql.db` / `mysql.tables_priv` réparées (sauvegarde dans `
 ### Hypothèses Phase 10 (à valider — cahier des charges indisponible)
 - Validé : Windows + XAMPP, Planificateur de tâches, worker en service NSSM, sauvegarde conjointe base + storage/app/private. Tâches installées par l'exploitant, non automatisées depuis le dépôt. Scripts non exécutés sur un serveur de production.
 - Aucun système de supervision, de notification ni de restauration automatisée ; sauvegarde nocturne à planifier et à copier hors serveur.
+
+### Phase 11 — règles métier RH confirmées (congés) — en attente de validation
+Règles fournies par la RH de DLS et codées :
+- Week-end = vendredi + samedi (`config/conges.php`, défaut `5,6`) ; le dimanche est ouvré. Ces jours ne sont exclus que pour les types en jours ouvrés (inchangé).
+- Jours fériés 2026 pré-remplis (`JoursFeriesSeeder`) : 1er janvier, 1er mai, 27 et 28 juin (récurrents) ; Aïd al-Fitr 20-21 mars, Arafat 26 mai, Aïd al-Adha 27-28 mai, Nouvel An musulman 16 juin, Mouloud 25 août (non récurrents : à ressaisir chaque année). L'écran « Jours fériés » reste la table de configuration modifiable.
+- Férié tombant un vendredi ou un samedi : aucun report automatique ; en cas de décret, on ajoute la date du report dans l'écran.
+- Demi-journées : colonnes `conges.demi_debut` / `demi_fin` (migration `2026_10_31_000022`), cases à cocher sur le formulaire ; le premier et/ou le dernier jour compte 0,5 s'il est décompté (une seule déduction si période d'un jour).
+- Prorata à l'embauche : `CongeService::droitInitial()` = droit annuel × jours restants de l'année d'embauche (embauche incluse) / jours de l'année, arrondi à la demi-journée ; aucun droit avant l'année d'embauche ; agent sans date d'embauche = droit complet. Utilisé pour le solde théorique et la création du solde à l'approbation.
+- Pas de report automatique (déjà le cas) : un report accordé par la RH se saisit dans « Soldes de congés » (`jours_report`).
+- Tests : 7 nouveaux dans `CongesTest`, 5 tests existants adaptés au week-end de deux jours et à 11 jours fériés seedés.
+
+Hypothèses Phase 11 (à valider) :
+- Les jours fériés ne sont retirés que pour les types en jours ouvrés (règle antérieure conservée) ; un congé en jours calendaires les compte.
+- Arrondi du prorata à la demi-journée la plus proche (la règle exacte n'a pas été précisée).
+- Les soldes déjà créés sur la base de développement ne sont pas recalculés.
+- Le 28 juin 2026 est un dimanche : ouvré par défaut mais férié, donc exclu.
+- Migration `2026_10_31_000022` et `JoursFeriesSeeder` appliqués sur `erp_rh_dls` (11 jours fériés).
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
