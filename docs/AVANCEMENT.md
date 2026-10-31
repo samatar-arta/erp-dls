@@ -195,10 +195,18 @@ Hypothèses Phase 11 (suite) (à valider) :
 - Les permissions rejetées ou expirées et les brouillons ne comptent pas dans le crédit de 11 jours.
 - **Non appliqués sur `erp_rh_dls`** : migration `2026_11_01_000023` et seeder `ModulesRhSeeder` (création du type `PERMISSION_FAMILIALE`) à lancer avant usage.
 
-### Phase 12 — Finalisation & Données historiques — à faire (objectif validé, non codé)
-1. **Qualification de l'existant** : commande Artisan `dls:qualifier-historique-conges` qui parcourt les congés `ANNUEL` déjà en base et leur attribue rétroactivement la qualification (titre de congé ≥ 30 jours ; autorisation d'absence de 5 à 29 jours).
-2. **Recalcul des soldes** : vérifier que les compteurs et soldes de congés des agents tiennent compte de cet historique selon les nouvelles règles de déduction, notamment les absences prises durant les heures de travail lorsque les départements et sociétés sont renseignés.
-- Points à trancher à l'ouverture de la phase : traitement des congés historiques de moins de 5 jours (non conformes à la règle), conduite à tenir pour les soldes déjà débités, mode de simulation (« dry-run ») avant écriture.
+### Phase 12 — Finalisation & Données historiques — fait — en attente de validation
+- Commande `php artisan dls:qualifier-historique-conges` (`HistoriqueCongesService`) : **simulation par défaut**, `--appliquer` pour écrire, `--soldes` pour inclure le recalcul des soldes. Relançable sans effet de bord.
+- **Qualification rétroactive** : congés `ANNUEL` sans qualification → titre de congé (≥ 30 jours calendaires) ou autorisation d'absence (5 à 29 jours). Écriture directe en base (les gardes du modèle ne s'appliquent pas à un dossier déjà traité) et une entrée d'audit `conge.historique_qualifie` récapitulative.
+- **Congés historiques de moins de 5 jours** (non conformes à la règle actuelle) : qualifiés autorisation d'absence, listés dans le rapport, jamais modifiés ni annulés.
+- **Recalcul des soldes** : `jours_pris` de chaque solde `ANNUEL` = jours des congés approuvés effectivement déduits (règles DLS : agent DLS, mise à disposition, heures de travail). Seul `jours_pris` est corrigé (`jours_acquis` et `jours_report` manuels conservés) ; chaque correction est tracée par l'audit du modèle `SoldeConge` (avant/après). Les jours déduits sans ligne de solde sont signalés, la ligne n'est pas créée.
+- Tests : `HistoriqueCongesTest` (13). Suite complète : 419 tests, 1630 assertions, tous verts.
+
+Hypothèses Phase 12 (à valider) :
+- Les congés historiques n'ont pas d'indicateur « heures de travail » (inconnu) : ils sont considérés hors heures de travail, donc déduits, ce qui correspond à ce qui était débité jusque-là.
+- Les congés non approuvés (brouillons, en circuit, rejetés, expirés) ne comptent pas dans `jours_pris`.
+- Un solde peut devenir négatif après correction : il apparaît alors dans la colonne « Restant après » du rapport, sans blocage.
+- Procédure d'exploitation conseillée : sauvegarde, simulation (`--soldes`), relecture du rapport, puis `--appliquer --soldes`. Non exécutée sur `erp_rh_dls`.
 
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
