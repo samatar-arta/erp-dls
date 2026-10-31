@@ -181,6 +181,25 @@ Hypothèses Phase 11 (à valider) :
 - Le 28 juin 2026 est un dimanche : ouvré par défaut mais férié, donc exclu.
 - Migration `2026_10_31_000022` et `JoursFeriesSeeder` appliqués sur `erp_rh_dls` (11 jours fériés).
 
+### Phase 11 (suite) — règles d'absence et permissions DLS — en attente de validation
+- **Qualification (type `ANNUEL` seulement)**, en jours calendaires (demi-journées comprises) : ≥ 30 jours = titre de congé ; 5 à 29 jours = autorisation d'absence ; moins de 5 jours = refus (`RegleMetierException`). Calculée par le serveur (`CongeService::qualifier()`), stockée dans `conges.qualification`, recalculée à chaque modification de brouillon, jamais saisie.
+- **Déduction du solde** (`CongeService::deduitDuSolde()`) : titre de congé et autorisation hors heures de travail = déduits. Autorisation durant les heures de travail (`conges.pendant_heures_travail`) = déduite seulement si l'agent est DLS (département de la société dont le code est `conges.societe_dls`, défaut `DLS`) et n'est pas mis à disposition d'un client (`employes.mis_a_disposition_societe_id`). Une absence non déduite n'est ni contrôlée contre le solde, ni comptée dans les jours engagés, ni débitée.
+- **Permissions exceptionnelles** : type `PERMISSION_FAMILIALE` (jours ouvrés, hors solde), motif obligatoire (`MotifPermission` : mariage du travailleur 3, mariage d'un enfant 1, décès conjoint/enfant/père/mère 3, décès frère/sœur 1, décès beau-parent 1, naissance 3), durée limitée au barème du motif, plafond de 11 jours ouvrés par agent et par année civile de la date de début. Contrôlé à la création, à la soumission et à l'approbation (verrou sur l'agent) ; les demandes rejetées ou expirées ne consomment pas le crédit. Exemptées du seuil de 5 jours.
+- Interface : case « durant les heures de travail » (type ANNUEL), choix du motif (permissions), champ « Mis à disposition de » sur la fiche agent ; variables de modèle `qualification` et `motif_permission`.
+- Migration `2026_11_01_000023` (colonnes `conges.qualification`, `pendant_heures_travail`, `motif_permission` ; `employes.mis_a_disposition_societe_id`).
+- Tests : `CongesReglesDlsTest` (34 tests) ; `CongesTest` (3 durées allongées pour respecter le seuil de 5 jours) et `ModulesRhTest` (7 types de congé) adaptés. Suite complète : 406 tests, 1592 assertions, tous verts.
+
+Hypothèses Phase 11 (suite) (à valider) :
+- Le barème est un plafond de durée par motif (une durée inférieure est acceptée).
+- « Agent DLS » = département rattaché à la société DLS, à défaut société de l'agent ; l'indicateur « heures de travail » est écarté pour un titre de congé.
+- Les permissions rejetées ou expirées et les brouillons ne comptent pas dans le crédit de 11 jours.
+- **Non appliqués sur `erp_rh_dls`** : migration `2026_11_01_000023` et seeder `ModulesRhSeeder` (création du type `PERMISSION_FAMILIALE`) à lancer avant usage.
+
+### Phase 12 — Finalisation & Données historiques — à faire (objectif validé, non codé)
+1. **Qualification de l'existant** : commande Artisan `dls:qualifier-historique-conges` qui parcourt les congés `ANNUEL` déjà en base et leur attribue rétroactivement la qualification (titre de congé ≥ 30 jours ; autorisation d'absence de 5 à 29 jours).
+2. **Recalcul des soldes** : vérifier que les compteurs et soldes de congés des agents tiennent compte de cet historique selon les nouvelles règles de déduction, notamment les absences prises durant les heures de travail lorsque les départements et sociétés sont renseignés.
+- Points à trancher à l'ouverture de la phase : traitement des congés historiques de moins de 5 jours (non conformes à la règle), conduite à tenir pour les soldes déjà débités, mode de simulation (« dry-run ») avant écriture.
+
 ### Reste hors Phase 1
 - Test 29.1 (SENIOR valide, ADMIN approuve, ADMIN n'approuve pas son propre dossier) : fait en Phase 3 (WorkflowTest).
 - Ressource Filament Employés complète (onglets, dossier numérique) : Phase 4.

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\MotifPermission;
+use App\Enums\QualificationConge;
 use App\Models\Concerns\HasWorkflow;
 use App\Models\Concerns\VerifieCompatibiliteModele;
 use Illuminate\Database\Eloquent\Model;
@@ -28,7 +30,7 @@ class Conge extends Model
     protected $table = 'conges';
 
     /** @var list<string> */
-    protected $fillable = ['matricule', 'type_conge_id', 'model_conge_id', 'user_id', 'date_debut', 'date_fin', 'demi_debut', 'demi_fin', 'nbre_jours', 'motif'];
+    protected $fillable = ['matricule', 'type_conge_id', 'model_conge_id', 'user_id', 'date_debut', 'date_fin', 'demi_debut', 'demi_fin', 'nbre_jours', 'qualification', 'pendant_heures_travail', 'motif_permission', 'motif'];
 
     protected function casts(): array
     {
@@ -38,7 +40,21 @@ class Conge extends Model
             'demi_debut' => 'boolean',
             'demi_fin' => 'boolean',
             'nbre_jours' => 'decimal:1',
+            'qualification' => QualificationConge::class,
+            'pendant_heures_travail' => 'boolean',
+            'motif_permission' => MotifPermission::class,
         ];
+    }
+
+    /** Libellés pour les modèles de documents (la liste blanche de variables lit des propriétés). */
+    public function getQualificationLibelleAttribute(): ?string
+    {
+        return $this->qualification?->label();
+    }
+
+    public function getMotifPermissionLibelleAttribute(): ?string
+    {
+        return $this->motif_permission?->label();
     }
 
     public function employe(): BelongsTo

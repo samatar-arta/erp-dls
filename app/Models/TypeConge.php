@@ -10,6 +10,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TypeConge extends Model
 {
+    /** Type soumis à la qualification titre de congé / autorisation d'absence. */
+    public const CODE_ANNUEL = 'ANNUEL';
+
+    /** Type des permissions exceptionnelles pour événements familiaux. */
+    public const CODE_PERMISSION = 'PERMISSION_FAMILIALE';
+
     protected $table = 'types_conges';
 
     protected $fillable = ['code', 'name', 'color', 'default_days_per_year', 'requires_justificatif', 'requires_workflow', 'mode_calcul', 'is_active'];
@@ -23,6 +29,16 @@ class TypeConge extends Model
             'mode_calcul' => ModeCalcul::class,
             'is_active' => 'boolean',
         ];
+    }
+
+    public function estAnnuel(): bool
+    {
+        return $this->code === self::CODE_ANNUEL;
+    }
+
+    public function estPermissionExceptionnelle(): bool
+    {
+        return $this->code === self::CODE_PERMISSION;
     }
 
     public function modeles(): HasMany

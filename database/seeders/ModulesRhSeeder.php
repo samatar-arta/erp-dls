@@ -68,6 +68,7 @@ class ModulesRhSeeder extends Seeder
             ['SANS_SOLDE', 'Congé sans solde', '#6b7280', 0, false, ModeCalcul::Calendaire],
             ['MATERNITE', 'Congé de maternité', '#db2777', 0, true, ModeCalcul::Calendaire],
             ['PATERNITE', 'Congé de paternité', '#2563eb', 0, true, ModeCalcul::Calendaire],
+            ['PERMISSION_FAMILIALE', 'Permission exceptionnelle (événement familial)', '#7c3aed', 0, true, ModeCalcul::Ouvre],
         ];
 
         foreach ($types as [$code, $nom, $couleur, $jours, $justificatif, $mode]) {

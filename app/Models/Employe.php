@@ -32,7 +32,7 @@ class Employe extends Model
         'categorie_employe', 'statut_employe', 'date_sortie', 'motif_sortie', 'telephone',
         'num_CNSS', 'num_CNI', 'niveau_etude', 'adresse', 'situation_familiale',
         'personne_contacter', 'lien_parental', 'telephone_parental', 'formation_certificat',
-        'permis_conduite', 'categorie', 'handicap', 'societe_id', 'departement_id', 'site_id',
+        'permis_conduite', 'categorie', 'handicap', 'societe_id', 'mis_a_disposition_societe_id', 'departement_id', 'site_id',
         'dossier_path', 'cree_par',
     ];
 
@@ -106,6 +106,12 @@ class Employe extends Model
     public function societe(): BelongsTo
     {
         return $this->belongsTo(Societe::class);
+    }
+
+    /** Société cliente chez laquelle l'agent est mis à disposition (null s'il travaille pour sa propre entité). */
+    public function societeMiseADisposition(): BelongsTo
+    {
+        return $this->belongsTo(Societe::class, 'mis_a_disposition_societe_id');
     }
 
     public function departement(): BelongsTo

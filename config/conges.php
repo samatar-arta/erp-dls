@@ -8,4 +8,10 @@ return [
     | Par défaut : vendredi et samedi (week-end officiel à Djibouti). Liste séparée par des virgules dans CONGES_JOURS_NON_OUVRES.
     */
     'jours_non_ouvres' => array_map('intval', array_filter(explode(',', (string) env('CONGES_JOURS_NON_OUVRES', '5,6')))),
+
+    /*
+    | Code de la société DLS : seuls ses agents (hors mis à disposition d'un client) voient une absence
+    | durant les heures de travail déduite de leur solde.
+    */
+    'societe_dls' => env('CONGES_SOCIETE_DLS', 'DLS'),
 ];

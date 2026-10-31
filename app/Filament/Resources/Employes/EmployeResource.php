@@ -12,6 +12,7 @@ use App\Filament\Resources\Employes\RelationManagers\AffectationsRelationManager
 use App\Filament\Resources\Employes\RelationManagers\FichiersRelationManager;
 use App\Models\Employe;
 use App\Models\SiteDepartement;
+use App\Models\Societe;
 use App\Models\TypeContrat;
 use App\Models\User;
 use App\Services\PerimetreService;
@@ -94,6 +95,10 @@ class EmployeResource extends Resource
                 DatePicker::make('date_embauche')->label('Date d\'embauche')->required(),
                 Select::make('type_contrat_id')->label('Type de contrat')
                     ->options(fn (): array => TypeContrat::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id')->all()),
+                Select::make('mis_a_disposition_societe_id')->label('Mis à disposition de (société cliente)')
+                    ->options(fn (): array => Societe::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id')->all())
+                    ->placeholder('Aucune')
+                    ->helperText('Agent DLS travaillant chez un client (ex. SGTD) : ses absences pendant les heures de travail ne sont pas déduites du solde.'),
                 TextInput::make('categorie_employe')->label('Catégorie d\'employé')->maxLength(255),
                 Select::make('statut_employe')->label('Statut')->options(self::STATUTS)->default('actif')->required(),
                 DatePicker::make('date_sortie')->label('Date de sortie'),

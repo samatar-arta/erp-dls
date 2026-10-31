@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModuleRh;
+use App\Enums\MotifPermission;
 use App\Enums\WorkflowStatut;
 use App\Exceptions\RegleMetierException;
 use App\Models\Conge;
@@ -88,8 +89,8 @@ class EnregistrementRhService
 
             if ($enregistrement instanceof Conge) {
                 // Le nombre de jours est toujours recalculé par le serveur à partir des dates et du type.
-                $donnees['nbre_jours'] = $this->calculerJoursConge(
-                    $donnees + $enregistrement->only(['type_conge_id', 'date_debut', 'date_fin', 'demi_debut', 'demi_fin']),
+                $donnees = $this->donneesConge(
+                    $donnees + $enregistrement->only(['type_conge_id', 'date_debut', 'date_fin', 'demi_debut', 'demi_fin', 'pendant_heures_travail', 'motif_permission']),
                     $enregistrement->matricule,
                     (int) $enregistrement->getKey(),
                 );
@@ -184,23 +185,38 @@ class EnregistrementRhService
     }
 
     /**
+     * Contrôle la demande de congé et ajoute les champs calculés par le serveur (jamais saisis) :
+     * nombre de jours, qualification (type ANNUEL), indicateur « heures de travail » et motif de permission,
+     * ces deux derniers n'étant conservés que pour les types où ils ont un sens.
+     *
      * @param  array<string, mixed>  $donnees
+     * @return array<string, mixed>
      */
-    private function calculerJoursConge(array $donnees, string $matricule, ?int $ignorerCongeId = null): float
+    private function donneesConge(array $donnees, string $matricule, ?int $ignorerCongeId = null): array
     {
         $type = TypeConge::query()->findOrFail($donnees['type_conge_id'] ?? null);
+        $debut = Carbon::parse($donnees['date_debut']);
+        $fin = Carbon::parse($donnees['date_fin']);
+        $demiDebut = (bool) ($donnees['demi_debut'] ?? false);
+        $demiFin = (bool) ($donnees['demi_fin'] ?? false);
 
-        return $this->conges->preparer(
-            $matricule,
-            $type,
-            Carbon::parse($donnees['date_debut']),
-            Carbon::parse($donnees['date_fin']),
-            $ignorerCongeId,
-            (bool) ($donnees['demi_debut'] ?? false),
-            (bool) ($donnees['demi_fin'] ?? false),
-        );
+        $motif = $donnees['motif_permission'] ?? null;
+        $motif = $motif instanceof MotifPermission ? $motif : (is_string($motif) && $motif !== '' ? MotifPermission::tryFrom($motif) : null);
+
+        if ($type->estPermissionExceptionnelle() && ($donnees['motif_permission'] ?? null) !== null && $motif === null) {
+            throw new RegleMetierException('Motif de permission exceptionnelle inconnu.');
+        }
+
+        $pendantHeures = $type->estAnnuel() && (bool) ($donnees['pendant_heures_travail'] ?? false);
+
+        $donnees['nbre_jours'] = $this->conges->preparer($matricule, $type, $debut, $fin, $ignorerCongeId, $demiDebut, $demiFin, $pendantHeures, $type->estPermissionExceptionnelle() ? $motif : null);
+        $donnees['qualification'] = $this->conges->qualifier($type, $debut, $fin, $demiDebut, $demiFin)?->value;
+        // La mention « durant les heures de travail » n'a de sens que pour une autorisation d'absence.
+        $donnees['pendant_heures_travail'] = $pendantHeures && $donnees['qualification'] === \App\Enums\QualificationConge::AutorisationAbsence->value;
+        $donnees['motif_permission'] = $type->estPermissionExceptionnelle() ? $motif?->value : null;
+
+        return $donnees;
     }
-
     private function employeAccessible(string $matricule, User $acteur): Employe
     {
         $employe = Employe::query()->where('matricule', $matricule)->first();
@@ -226,7 +242,7 @@ class EnregistrementRhService
                 break;
             case ModuleRh::Conge:
                 $donnees['user_id'] = $acteur->getKey();
-                $donnees['nbre_jours'] = $this->calculerJoursConge($donnees, $employe->matricule);
+                $donnees = $this->donneesConge($donnees, $employe->matricule);
                 break;
             case ModuleRh::Evaluation:
                 $donnees['evaluateur_id'] ??= $acteur->getKey();

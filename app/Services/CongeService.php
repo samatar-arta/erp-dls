@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\ModeCalcul;
+use App\Enums\MotifPermission;
+use App\Enums\QualificationConge;
 use App\Enums\WorkflowStatut;
 use App\Exceptions\RegleMetierException;
 use App\Models\Conge;
@@ -27,6 +29,15 @@ class CongeService
         WorkflowStatut::EnAttenteValidation,
         WorkflowStatut::Valide,
         WorkflowStatut::EnAttenteApprobation,
+    ];
+
+    /** Statuts dont les jours comptent pour le plafond des permissions : en circuit ou approuvés. */
+    private const STATUTS_ENGAGES_ET_APPROUVE = [
+        WorkflowStatut::DocumentSoumis,
+        WorkflowStatut::EnAttenteValidation,
+        WorkflowStatut::Valide,
+        WorkflowStatut::EnAttenteApprobation,
+        WorkflowStatut::Approuve,
     ];
 
     /**
@@ -65,8 +76,17 @@ class CongeService
     /**
      * Contrôles et calcul à la création / modification d'un brouillon : renvoie le nombre de jours décompté.
      */
-    public function preparer(string $matricule, TypeConge $type, Carbon $debut, Carbon $fin, ?int $ignorerCongeId = null, bool $demiDebut = false, bool $demiFin = false): float
-    {
+    public function preparer(
+        string $matricule,
+        TypeConge $type,
+        Carbon $debut,
+        Carbon $fin,
+        ?int $ignorerCongeId = null,
+        bool $demiDebut = false,
+        bool $demiFin = false,
+        bool $pendantHeuresTravail = false,
+        ?MotifPermission $motif = null,
+    ): float {
         $parAnnee = $this->joursParAnnee($type, $debut, $fin, $demiDebut, $demiFin);
         $total = array_sum($parAnnee);
 
@@ -74,34 +94,61 @@ class CongeService
             throw new RegleMetierException('La période choisie ne contient aucun jour décompté (week-ends et jours fériés exclus).');
         }
 
+        $qualification = $this->qualifier($type, $debut, $fin, $demiDebut, $demiFin);
+
+        $this->verifierPermission($matricule, $type, $motif, $total, $debut, $ignorerCongeId, self::STATUTS_ENGAGES_ET_APPROUVE);
         $this->verifierChevauchement($matricule, $debut, $fin, $ignorerCongeId);
-        $this->verifierSolde($matricule, $type, $parAnnee, $ignorerCongeId);
+
+        if ($this->deduitDuSolde($this->employe($matricule), $type, $qualification, $pendantHeuresTravail)) {
+            $this->verifierSolde($matricule, $type, $parAnnee, $ignorerCongeId);
+        }
 
         return $total;
     }
 
-    /** Contrôle repris à la soumission : un autre congé a pu consommer le solde entre-temps. */
+    /** Contrôle repris à la soumission : un autre congé a pu consommer le solde ou le crédit de permissions entre-temps. */
     public function verifierPourSoumission(Conge $conge): void
     {
         $type = $conge->type;
-        $parAnnee = $this->joursParAnnee($type, $conge->date_debut, $conge->date_fin, (bool) $conge->demi_debut, (bool) $conge->demi_fin);
+        $demiDebut = (bool) $conge->demi_debut;
+        $demiFin = (bool) $conge->demi_fin;
+        $parAnnee = $this->joursParAnnee($type, $conge->date_debut, $conge->date_fin, $demiDebut, $demiFin);
+        $qualification = $this->qualifier($type, $conge->date_debut, $conge->date_fin, $demiDebut, $demiFin);
 
+        $this->verifierPermission($conge->matricule, $type, $conge->motif_permission, array_sum($parAnnee), $conge->date_debut, (int) $conge->getKey(), self::STATUTS_ENGAGES_ET_APPROUVE);
         $this->verifierChevauchement($conge->matricule, $conge->date_debut, $conge->date_fin, (int) $conge->getKey());
-        $this->verifierSolde($conge->matricule, $type, $parAnnee, (int) $conge->getKey());
+
+        if ($this->deduitDuSolde($this->employe($conge->matricule), $type, $qualification, (bool) $conge->pendant_heures_travail)) {
+            $this->verifierSolde($conge->matricule, $type, $parAnnee, (int) $conge->getKey());
+        }
     }
 
     /**
      * À l'approbation : débit du solde sous verrou. Refuse si le solde réel est insuffisant (rollback du workflow).
+     * Une permission exceptionnelle ne débite jamais le solde mais respecte le plafond annuel.
      */
     public function debiterALApprobation(Conge $conge): void
     {
         $type = $conge->type;
+        $demiDebut = (bool) $conge->demi_debut;
+        $demiFin = (bool) $conge->demi_fin;
+        $parAnnee = $this->joursParAnnee($type, $conge->date_debut, $conge->date_fin, $demiDebut, $demiFin);
 
-        if (! $this->estControle($type)) {
+        if ($type->estPermissionExceptionnelle()) {
+            // Verrou sur l'agent : deux approbations simultanées ne peuvent pas dépasser le plafond ensemble.
+            Employe::query()->where('matricule', $conge->matricule)->lockForUpdate()->first();
+            $this->verifierPermission($conge->matricule, $type, $conge->motif_permission, array_sum($parAnnee), $conge->date_debut, (int) $conge->getKey(), [WorkflowStatut::Approuve]);
+
             return;
         }
 
-        foreach ($this->joursParAnnee($type, $conge->date_debut, $conge->date_fin, (bool) $conge->demi_debut, (bool) $conge->demi_fin) as $annee => $jours) {
+        $qualification = $this->qualifier($type, $conge->date_debut, $conge->date_fin, $demiDebut, $demiFin);
+
+        if (! $this->deduitDuSolde($this->employe($conge->matricule), $type, $qualification, (bool) $conge->pendant_heures_travail)) {
+            return;
+        }
+
+        foreach ($parAnnee as $annee => $jours) {
             $solde = $this->soldeVerrouille($conge->matricule, $type, $annee);
 
             if ($jours > $solde->restant() + 1e-9) {
@@ -114,6 +161,119 @@ class CongeService
             }
 
             $solde->forceFill(['jours_pris' => (float) $solde->jours_pris + $jours])->save();
+        }
+    }
+
+    /** Durée en jours calendaires (demi-journées comprises), indépendante du mode de calcul du type. */
+    public function joursCalendaires(Carbon $debut, Carbon $fin, bool $demiDebut = false, bool $demiFin = false): float
+    {
+        $jours = (float) ($debut->copy()->startOfDay()->diffInDays($fin->copy()->startOfDay(), true) + 1);
+
+        if ($debut->isSameDay($fin)) {
+            return ($demiDebut || $demiFin) ? $jours - 0.5 : $jours;
+        }
+
+        return $jours - ($demiDebut ? 0.5 : 0.0) - ($demiFin ? 0.5 : 0.0);
+    }
+
+    /**
+     * Titre de congé (≥ 30 jours calendaires) ou autorisation d'absence (5 à 29 jours) pour le type ANNUEL ;
+     * null pour les autres types. Lève une exception si une autorisation d'absence dure moins de 5 jours.
+     */
+    public function qualifier(TypeConge $type, Carbon $debut, Carbon $fin, bool $demiDebut = false, bool $demiFin = false): ?QualificationConge
+    {
+        if (! $type->estAnnuel()) {
+            return null;
+        }
+
+        $jours = $this->joursCalendaires($debut, $fin, $demiDebut, $demiFin);
+        $qualification = QualificationConge::pourDuree($jours);
+
+        if ($qualification === QualificationConge::AutorisationAbsence && $jours < QualificationConge::SEUIL_MINIMAL_AUTORISATION) {
+            throw new RegleMetierException(sprintf(
+                'Une autorisation d\'absence doit durer au moins %d jours (de %d à %d jours) ; %s jour(s) demandé(s).',
+                (int) QualificationConge::SEUIL_MINIMAL_AUTORISATION,
+                (int) QualificationConge::SEUIL_MINIMAL_AUTORISATION,
+                (int) QualificationConge::SEUIL_TITRE_CONGE - 1,
+                $this->nombre($jours),
+            ));
+        }
+
+        return $qualification;
+    }
+
+    /**
+     * La demande est-elle déduite du solde de congé annuel ?
+     * - permission exceptionnelle ou type sans droit annuel : jamais ;
+     * - titre de congé et autorisation d'absence hors heures de travail : oui ;
+     * - autorisation d'absence durant les heures de travail : seulement pour un agent DLS non mis à disposition d'un client.
+     */
+    public function deduitDuSolde(Employe $employe, TypeConge $type, ?QualificationConge $qualification, bool $pendantHeuresTravail): bool
+    {
+        if ($type->estPermissionExceptionnelle() || ! $this->estControle($type)) {
+            return false;
+        }
+
+        if ($qualification === QualificationConge::AutorisationAbsence && $pendantHeuresTravail) {
+            return $this->estAgentDls($employe) && $employe->mis_a_disposition_societe_id === null;
+        }
+
+        return true;
+    }
+
+    /** Agent rattaché à la société DLS (par son département, à défaut par sa société). */
+    private function estAgentDls(Employe $employe): bool
+    {
+        $societe = $employe->departement?->societe ?? $employe->societe;
+
+        return $societe !== null && $societe->code === config('conges.societe_dls', 'DLS');
+    }
+
+    private function employe(string $matricule): Employe
+    {
+        return Employe::query()->with(['departement.societe', 'societe'])->where('matricule', $matricule)->firstOrFail();
+    }
+
+    /**
+     * Permission exceptionnelle : motif obligatoire, durée (jours ouvrés) dans le barème du motif, et crédit annuel
+     * de 11 jours par agent (année civile de la date de début) non dépassé.
+     *
+     * @param  list<WorkflowStatut>  $statutsComptes  statuts des autres permissions qui consomment le crédit
+     */
+    private function verifierPermission(string $matricule, TypeConge $type, ?MotifPermission $motif, float $jours, Carbon $debut, ?int $ignorerCongeId, array $statutsComptes): void
+    {
+        if (! $type->estPermissionExceptionnelle()) {
+            return;
+        }
+
+        if ($motif === null) {
+            throw new RegleMetierException('Le motif de la permission exceptionnelle est obligatoire.');
+        }
+
+        if ($jours > $motif->jours() + 1e-9) {
+            throw new RegleMetierException(sprintf(
+                'Le motif « %s » ouvre droit à %s jour(s) ouvré(s) au plus ; %s demandé(s).',
+                $motif->label(),
+                $this->nombre($motif->jours()),
+                $this->nombre($jours),
+            ));
+        }
+
+        $consommes = (float) Conge::query()
+            ->where(['matricule' => $matricule, 'type_conge_id' => $type->getKey()])
+            ->whereYear('date_debut', $debut->year)
+            ->when($ignorerCongeId !== null, fn ($q) => $q->whereKeyNot($ignorerCongeId))
+            ->whereHas('workflow', fn ($q) => $q->whereIn('statut', array_map(fn (WorkflowStatut $s): string => $s->value, $statutsComptes)))
+            ->sum('nbre_jours');
+
+        if ($consommes + $jours > MotifPermission::PLAFOND_ANNUEL + 1e-9) {
+            throw new RegleMetierException(sprintf(
+                'Crédit de permissions exceptionnelles dépassé en %d : %s jour(s) déjà consommé(s) ou engagé(s) sur %d, %s demandé(s).',
+                $debut->year,
+                $this->nombre($consommes),
+                (int) MotifPermission::PLAFOND_ANNUEL,
+                $this->nombre($jours),
+            ));
         }
     }
 
@@ -217,6 +377,10 @@ class CongeService
             ->whereHas('workflow', fn ($q) => $q->whereIn('statut', $statuts))
             ->get()
             ->each(function (Conge $autre) use ($type, $annee, &$total): void {
+                if (! $this->deduitDuSolde($this->employe($autre->matricule), $type, $autre->qualification, (bool) $autre->pendant_heures_travail)) {
+                    return;
+                }
+
                 $total += $this->joursParAnnee($type, $autre->date_debut, $autre->date_fin, (bool) $autre->demi_debut, (bool) $autre->demi_fin)[$annee] ?? 0.0;
             });
 

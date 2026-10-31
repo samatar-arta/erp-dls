@@ -59,7 +59,7 @@ class ModulesRhTest extends TestCase
             ['ATTESTATION_TRAVAIL', 'CERTIFICAT_TRAVAIL', 'ATTESTATION_SALAIRE', 'ATTESTATION_CONGE', 'DECISION_ADMINISTRATIVE'],
             TypeDocument::query()->pluck('code')->all(),
         );
-        $this->assertSame(6, TypeConge::query()->count());
+        $this->assertSame(7, TypeConge::query()->count());
         $this->assertSame(3, \App\Models\NiveauSanction::query()->count());
         $this->assertSame(4, \App\Models\TypeEvaluation::query()->count());
         $this->assertSame(4, \App\Models\TypePromotion::query()->count());

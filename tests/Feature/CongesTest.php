@@ -175,7 +175,7 @@ class CongesTest extends TestCase
     public function test_les_periodes_contigues_sont_acceptees(): void
     {
         $this->demande($this->annuel, '2026-03-02', '2026-03-06');
-        $suivant = $this->demande($this->annuel, '2026-03-07', '2026-03-10');
+        $suivant = $this->demande($this->annuel, '2026-03-07', '2026-03-12');
 
         $this->assertNotNull($suivant->getKey());
     }
@@ -307,10 +307,10 @@ class CongesTest extends TestCase
 
     public function test_un_conge_a_cheval_sur_deux_annees_debite_chaque_annee(): void
     {
-        $conge = $this->demande($this->annuel, '2026-12-30', '2027-01-02');
+        $conge = $this->demande($this->annuel, '2026-12-28', '2027-01-02');
         $this->approuver($conge);
 
-        $this->assertEquals(2.0, $this->solde(2026)->jours_pris);
+        $this->assertEquals(4.0, $this->solde(2026)->jours_pris);
         $this->assertEquals(2.0, $this->solde(2027)->jours_pris);
     }
 
@@ -385,11 +385,11 @@ class CongesTest extends TestCase
 
     public function test_une_demi_journee_est_enregistree_et_debitee_a_l_approbation(): void
     {
-        $conge = $this->demande($this->annuel, '2026-03-02', '2026-03-06', ['demi_debut' => true]);
+        $conge = $this->demande($this->annuel, '2026-03-02', '2026-03-07', ['demi_debut' => true]);
 
-        $this->assertEquals(4.5, $conge->fresh()->nbre_jours);
+        $this->assertEquals(5.5, $conge->fresh()->nbre_jours);
         $this->approuver($conge);
-        $this->assertEquals(4.5, $this->solde(2026)->jours_pris);
+        $this->assertEquals(5.5,$this->solde(2026)->jours_pris);
     }
 
     public function test_une_demi_journee_sur_un_jour_non_decompte_ne_change_rien(): void
